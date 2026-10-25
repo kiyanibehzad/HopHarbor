@@ -1,0 +1,72 @@
+{
+  "servers": [
+    {
+      "id": "gateway",
+      "name": "Example gateway",
+      "host": "jump.example.com",
+      "port": 22,
+      "username": "tunneluser",
+      "auth_mode": "agent",
+      "identity_file": "",
+      "jump_id": null
+    },
+    {
+      "id": "edge",
+      "name": "Example destination",
+      "host": "edge.example.com",
+      "port": 22,
+      "username": "tunneluser",
+      "auth_mode": "agent",
+      "identity_file": "",
+      "jump_id": "gateway"
+    }
+  ],
+  "tunnels": [
+    {
+      "id": "example-socks",
+      "name": "Example SOCKS",
+      "server_id": "edge",
+      "kind": "socks",
+      "local_port": 18080,
+      "pool_size": 1,
+      "autostart": false
+    },
+    {
+      "id": "example-http",
+      "name": "Example HTTP",
+      "server_id": "edge",
+      "kind": "http",
+      "local_port": 18081,
+      "pool_size": 1,
+      "autostart": false
+    },
+    {
+      "id": "example-tcp",
+      "name": "Example application forward",
+      "server_id": "edge",
+      "kind": "local",
+      "local_port": 18082,
+      "remote_host": "app.example.com",
+      "remote_port": 443,
+      "pool_size": 1,
+      "autostart": false,
+      "probe_type": "tcp"
+    },
+    {
+      "id": "example-upstream-http",
+      "name": "Example remote HTTP proxy",
+      "server_id": "edge",
+      "kind": "local",
+      "local_port": 18083,
+      "remote_host": "127.0.0.1",
+      "remote_port": 3128,
+      "pool_size": 1,
+      "autostart": false,
+      "probe_type": "http"
+    }
+  ],
+  "migration": {
+    "phase": "testing",
+    "message": "Synthetic examples only; configure trusted server identities and credentials before connecting."
+  }
+}

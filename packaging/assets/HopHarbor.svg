@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">HopHarbor app icon</title>
+  <desc id="desc">A white H made from two connected piers and four network nodes on a teal and navy rounded tile.</desc>
+  <defs>
+    <linearGradient id="tile" x1="120" y1="96" x2="904" y2="952" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#168F98"/><stop offset=".48" stop-color="#0B647A"/><stop offset="1" stop-color="#102E50"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="210" cy="130" r="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8EF3D6" stop-opacity=".19"/><stop offset="1" stop-color="#8EF3D6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="135%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="15" stdDeviation="13.5" flood-color="#071E32" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="198" fill="url(#tile)" filter="url(#shadow)"/>
+  <rect x="72" y="72" width="880" height="880" rx="198" fill="url(#glow)"/>
+  <rect x="73.5" y="73.5" width="877" height="877" rx="196.5" fill="none" stroke="#E5FFF8" stroke-opacity=".15" stroke-width="3"/>
+  <g stroke="#F4FDFB" fill="#F4FDFB" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M320 316V708M704 316V708" fill="none" stroke-width="78"/>
+    <path d="M320 550C420 430 604 430 704 550" fill="none" stroke-width="72"/>
+    <g stroke="none"><circle cx="320" cy="316" r="54"/><circle cx="320" cy="708" r="54"/><circle cx="704" cy="316" r="54"/><circle cx="704" cy="708" r="54"/></g>
+  </g>
+</svg>

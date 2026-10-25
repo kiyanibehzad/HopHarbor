@@ -1,0 +1,138 @@
+#!/usr/bin/python3
+"""Install HopHarbor for the current macOS user, without sudo."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import plistlib
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+
+ROOT = Path(__file__).resolve().parent
+LABEL = 'local.hopharbor.manager'
+GOST_VERSION = '3.3.1'
+GOST_SHA256 = '6b87b8c5fd728536d1b208382fc6b93a7bb04111d633a9f1e4651cd1ce62886d'
+
+
+def run(args, check=True):
+    return subprocess.run([str(x) for x in args], check=check)
+
+
+def refresh_app_registration(bundle):
+    """Refresh only this installed bundle; leave Finder, Dock and global caches alone."""
+    os.utime(bundle, None)
+    registrar = Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
+    if registrar.is_file():
+        result = run([registrar, '-f', bundle], check=False)
+        if result.returncode:
+            print('The app was installed, but its LaunchServices registration could not be refreshed.')
+    os.utime(bundle, None)
+
+
+def fetch_gost(target):
+    artifact = 'gost_%s_darwin_arm64.tar.gz' % GOST_VERSION
+    url = 'https://github.com/go-gost/gost/releases/download/v%s/%s' % (GOST_VERSION, artifact)
+    cached = ROOT / 'vendor' / artifact
+    data = cached.read_bytes() if cached.exists() else urllib.request.urlopen(url, timeout=60).read()
+    if hashlib.sha256(data).hexdigest() != GOST_SHA256:
+        raise RuntimeError('GOST release digest does not match the pinned official release')
+    import io
+    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+        for member in archive.getmembers():
+            name = Path(member.name).name
+            if not member.isfile():
+                continue
+            if name == 'gost':
+                target.write_bytes(archive.extractfile(member).read())
+                target.chmod(0o700)
+            elif name.lower().startswith('license'):
+                (target.parent / 'GOST-LICENSE').write_bytes(archive.extractfile(member).read())
+    if not target.exists():
+        raise RuntimeError('The official release contains no GOST executable')
+    return {'name': 'GOST', 'version': GOST_VERSION, 'url': url, 'sha256': GOST_SHA256}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--no-start', action='store_true')
+    parser.add_argument('--uninstall', action='store_true')
+    parser.add_argument('--data-dir', type=Path, default=Path.home() / 'Library/Application Support/HopHarbor')
+    args = parser.parse_args()
+    if sys.platform != 'darwin' or platform.machine() != 'arm64':
+        raise SystemExit('This first release supports Apple Silicon macOS only.')
+    if os.getuid() == 0:
+        raise SystemExit('Run this installer as your ordinary macOS user, without sudo.')
+    os.umask(0o077)
+    data = args.data_dir.expanduser().resolve()
+    agent = Path.home() / 'Library/LaunchAgents' / (LABEL + '.plist')
+    bundle = Path.home() / 'Applications/HopHarbor.app'
+    target = 'gui/%s/%s' % (os.getuid(), LABEL)
+    if args.uninstall:
+        run(['/bin/launchctl', 'bootout', target], check=False)
+        agent.unlink(missing_ok=True)
+        if bundle.exists():
+            info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
+            if info.get('CFBundleIdentifier') != LABEL:
+                raise SystemExit('Refusing to remove an unrelated app bundle')
+            shutil.rmtree(bundle)
+        print('HopHarbor service and app removed. Configuration and Keychain entries are preserved.')
+        return
+    if not Path('/usr/bin/python3').exists() or not Path('/usr/bin/xcrun').exists():
+        raise SystemExit('Install Apple Command Line Tools first: xcode-select --install')
+    run(['/usr/bin/xcrun', '--find', 'swiftc'])
+    run(['/bin/launchctl', 'bootout', target], check=False)
+    data.mkdir(parents=True, exist_ok=True, mode=0o700)
+    data.chmod(0o700)
+    app = data / 'app'
+    app.mkdir(mode=0o700, exist_ok=True)
+    for name in ('manager.py', 'ssh_hop.py', 'askpass.py'):
+        shutil.copyfile(ROOT / name, app / name)
+        (app / name).chmod(0o700)
+    (app / 'web').mkdir(mode=0o700, exist_ok=True)
+    for name in ('index.html', 'app.js'):
+        shutil.copyfile(ROOT / 'web' / name, app / 'web' / name)
+        (app / 'web' / name).chmod(0o600)
+    (app / 'bin').mkdir(mode=0o700, exist_ok=True)
+    provenance = fetch_gost(app / 'bin/gost')
+    (app / 'THIRD-PARTY.json').write_text(json.dumps(provenance, indent=2))
+    run(['/usr/bin/python3', ROOT / 'packaging/build_helper.py', '--output', app / 'bin/keychain-helper'])
+    run(['/usr/bin/python3', ROOT / 'packaging/build_app.py', '--output', bundle, '--data-dir', data])
+    refresh_app_registration(bundle)
+    if not (data / 'config.json').exists():
+        (data / 'config.json').write_text(json.dumps({'servers': [], 'tunnels': [], 'migration': {
+            'phase': 'setup', 'message': 'Add sessions and port forwards. Credentials are stored in macOS Keychain.'}}, ensure_ascii=False, indent=2))
+    (data / 'config.json').chmod(0o600)
+    if not (data / 'known_hosts').exists():
+        (data / 'known_hosts').touch(mode=0o600)
+    logs = data / 'logs'
+    logs.mkdir(mode=0o700, exist_ok=True)
+    agent.parent.mkdir(parents=True, exist_ok=True)
+    definition = {
+        'Label': LABEL,
+        'ProgramArguments': ['/usr/bin/python3', str(app / 'manager.py'), '--data-dir', str(data), '--app-dir', str(app), '--port', '17777'],
+        'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 10,
+        'ProcessType': 'Background', 'LowPriorityIO': True, 'Umask': 63,
+        'StandardOutPath': str(logs / 'service.stdout.log'),
+        'StandardErrorPath': str(logs / 'service.stderr.log'),
+    }
+    agent.write_bytes(plistlib.dumps(definition))
+    agent.chmod(0o600)
+    run(['/usr/bin/plutil', '-lint', agent])
+    if not args.no_start:
+        run(['/bin/launchctl', 'bootstrap', 'gui/%s' % os.getuid(), agent])
+    print('Installed:', bundle)
+    print('Private configuration:', data)
+    print('Background service:', agent)
+    if args.no_start:
+        print('Service was not started (--no-start).')
+    else:
+        print('Open HopHarbor from your Applications folder. No tunnel is created by the public default configuration.')
+
+
+if __name__ == '__main__':
+    main()

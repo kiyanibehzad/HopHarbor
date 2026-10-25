@@ -1,0 +1,51 @@
+{
+  "test": "local-native-ssh-gost-smoke",
+  "external_connections": false,
+  "production_settings_changed": false,
+  "checks": [
+    {
+      "name": "two-isolated-local-ssh-servers",
+      "ok": true
+    },
+    {
+      "name": "native-ssh-two-hop-pools",
+      "ok": true,
+      "healthy_sessions": {
+        "smoke_socks": 4,
+        "smoke_http": 2,
+        "smoke_local": 1
+      }
+    },
+    {
+      "name": "socks-http-get",
+      "ok": true
+    },
+    {
+      "name": "http-proxy-absolute-uri",
+      "ok": true
+    },
+    {
+      "name": "http-connect-tls-private-ca-verified",
+      "ok": true
+    },
+    {
+      "name": "socks-tls-private-ca-verified",
+      "ok": true
+    },
+    {
+      "name": "local-tcp-forward",
+      "ok": true
+    },
+    {
+      "name": "one-child-failure-survival-and-reconnect",
+      "ok": true,
+      "successful_requests_during_recovery": 2
+    },
+    {
+      "name": "stop-releases-all-test-listeners",
+      "ok": true
+    }
+  ],
+  "ok": true,
+  "duration_seconds": 16.0
+}
