@@ -47,7 +47,10 @@ def bare_manager(data, config=None):
     m.config = copy.deepcopy(config or base_config())
     m.config_path = m.data / 'config.json'
     m.logs = collections.deque(maxlen=300)
+    m.fd_limits = {'soft': 8192, 'hard': 65536, 'warning': ''}
     m.runtime = {}
+    m.front_probe_lock = threading.Lock()
+    m.front_probes = {}
     m.halt = threading.Event()
     m.child_env = dict(os.environ)
     m.cookies = {}

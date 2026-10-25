@@ -14,18 +14,51 @@ import json
 import os
 from pathlib import Path
 import re
+import resource
 import secrets
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 import urllib.parse
 import uuid
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
+
+
+def kernel_file_limit():
+    """Read macOS's per-process ceiling without modifying any system setting."""
+    if sys.platform != 'darwin':
+        return None
+    try:
+        result = subprocess.run(['/usr/sbin/sysctl', '-n', 'kern.maxfilesperproc'],
+                                capture_output=True, text=True, timeout=2, check=True)
+        ceiling = int(result.stdout.strip())
+        return ceiling if ceiling > 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def raise_file_limit(target=8192, kernel_ceiling=None):
+    """Raise only this process's soft limit; children inherit it unchanged."""
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    except (OSError, ValueError) as error:
+        return {'soft': None, 'hard': None, 'warning': str(error)}
+    desired = min(target, hard) if hard != resource.RLIM_INFINITY else target
+    if kernel_ceiling is not None:
+        desired = min(desired, kernel_ceiling)
+    if soft != resource.RLIM_INFINITY and soft < desired:
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (desired, hard))
+            soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        except (OSError, ValueError) as error:
+            return {'soft': soft, 'hard': hard, 'warning': str(error)}
+    return {'soft': soft, 'hard': hard, 'warning': ''}
 
 
 def now():
@@ -103,6 +136,8 @@ class Child:
         self.error = ''
         self.blocked = False
         self.server_id = server_id
+        self.is_gost = (server_id is None and bool(argv) and getattr(manager, 'app', None) is not None
+                        and argv[0] == str(manager.app / 'bin/gost'))
 
     def spawn(self):
         self.last_start = time.monotonic()
@@ -129,6 +164,8 @@ class Child:
             line = raw.decode('utf-8', 'replace').strip()[:1200]
             if not line:
                 continue
+            if self.is_gost and self.manager.is_front_probe_eof(line):
+                continue
             # OpenSSH and GOST never receive a password through argv/config here.
             self.error = line
             if any(x in line.lower() for x in ('permission denied', 'host key verification failed',
@@ -154,23 +191,30 @@ class Child:
 
     def stop(self):
         p = self.proc
-        self.proc = None
         self.ready = False
         if p and p.poll() is None:
             try:
                 os.killpg(p.pid, signal.SIGTERM)
-                p.wait(timeout=4)
-            except subprocess.TimeoutExpired:
-                os.killpg(p.pid, signal.SIGKILL)
-                p.wait(timeout=2)
             except ProcessLookupError:
                 pass
+            try:
+                p.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(p.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                p.wait(timeout=2)
+        # Preserve ownership if terminating/waiting raised an error.
+        self.proc = None
         if p:
             (self.manager.data / 'runtime' / ('child-%s.json' % p.pid)).unlink(missing_ok=True)
 
 
 class Manager:
     def __init__(self, data_dir, app_dir, port):
+        # Do this before spawning managed children or reader/monitor threads.
+        self.fd_limits = raise_file_limit(kernel_ceiling=kernel_file_limit())
         self.data = Path(data_dir).resolve()
         self.app = Path(app_dir).resolve()
         self.port = port
@@ -194,7 +238,11 @@ class Manager:
         atomic_json(control, {'port': port, 'token': self.token})
         self.cookies = {}
         self.logs = collections.deque(maxlen=300)
+        if self.fd_limits['warning']:
+            self.log('error', 'Could not raise the open-file limit: ' + self.fd_limits['warning'])
         self.runtime = {}
+        self.front_probe_lock = threading.Lock()
+        self.front_probes = {}
         self.halt = threading.Event()
         self.child_env = dict(os.environ)
         self.child_env['LC_ALL'] = 'C'
@@ -236,6 +284,39 @@ class Manager:
             self.logs.append({'time': now(), 'level': level, 'message': message,
                               'tunnel_id': tunnel_id})
 
+    def front_probe(self, port):
+        """Check a frontend listener and record this exact empty TCP connection."""
+        try:
+            with socket.create_connection(('127.0.0.1', port), timeout=.2) as probe:
+                local = '%s:%s' % probe.getpeername()[:2]
+                remote = '%s:%s' % probe.getsockname()[:2]
+                timestamp = time.monotonic()
+                # Record before close, since close is what makes HTTP handlers log EOF.
+                with self.front_probe_lock:
+                    self.front_probes = {key: stamp for key, stamp in self.front_probes.items()
+                                         if 0 <= timestamp - stamp <= 5}
+                    self.front_probes[(local, remote)] = timestamp
+            return True
+        except OSError:
+            return False
+
+    def is_front_probe_eof(self, line):
+        """Consume only an exact, recent self-probe EOF; preserve other GOST errors."""
+        try:
+            record = json.loads(line)
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(record, dict) or record.get('msg') != 'EOF' or record.get('kind') != 'handler':
+            return False
+        local, remote = record.get('local'), record.get('remote')
+        if not isinstance(local, str) or not isinstance(remote, str):
+            return False
+        if record.get('client', remote) != remote:
+            return False
+        with self.front_probe_lock:
+            timestamp = self.front_probes.pop((local, remote), None)
+        return timestamp is not None and 0 <= time.monotonic() - timestamp <= 5
+
     def save(self):
         atomic_json(self.config_path, self.config)
 
@@ -270,6 +351,10 @@ class Manager:
             if not host_ok(s.get('host')) or not USER_RE.fullmatch(s.get('username', '')):
                 raise ValueError('Invalid session hostname or username.')
             s['port'] = integer(s.get('port', 22), 1, 65535, 'Invalid SSH port.')
+            s['keepalive_interval'] = integer(s.get('keepalive_interval', 30), 0, 600,
+                                              'The keepalive interval must be between 0 and 600 seconds.')
+            s['keepalive_count'] = integer(s.get('keepalive_count', 3), 1, 10,
+                                           'The keepalive retry count must be between 1 and 10.')
             s['name'] = str(s.get('name') or s['id'])[:100]
             s['auth_mode'] = s.get('auth_mode') or ('key' if s.get('identity_file') else 'agent')
             if s['auth_mode'] not in ('agent', 'key', 'password', 'key_password'):
@@ -319,14 +404,16 @@ class Manager:
         lines = ['Host *', '  BatchMode no', '  NumberOfPasswordPrompts 1', '  StrictHostKeyChecking yes',
                  '  UpdateHostKeys no', '  UserKnownHostsFile ' + quote(str(known)),
                  '  GlobalKnownHostsFile /dev/null', '  ControlMaster no', '  ControlPath none',
-                 '  ConnectTimeout 12', '  ConnectionAttempts 1', '  ServerAliveInterval 30',
-                 '  ServerAliveCountMax 3', '  TCPKeepAlive yes', '  ExitOnForwardFailure yes',
+                 '  ConnectTimeout 12', '  ConnectionAttempts 1',
+                 '  TCPKeepAlive yes', '  ExitOnForwardFailure yes',
                  '  RequestTTY no', '  Compression no', '  ForwardAgent no',
                  '  GSSAPIAuthentication no', '  AddKeysToAgent yes', '  UseKeychain yes',
                  '  LogLevel ERROR', '']
         for s in self.config['servers']:
             lines += ['Host pm_' + s['id'], '  HostName ' + s['host'],
-                      '  User ' + s['username'], '  Port ' + str(s['port'])]
+                      '  User ' + s['username'], '  Port ' + str(s['port']),
+                      '  ServerAliveInterval ' + str(s.get('keepalive_interval', 30)),
+                      '  ServerAliveCountMax ' + str(s.get('keepalive_count', 3))]
             if s.get('identity_file'):
                 lines += ['  IdentityFile ' + quote(s['identity_file']), '  IdentitiesOnly yes']
             mode = s.get('auth_mode', 'agent')
@@ -405,17 +492,105 @@ class Manager:
 
     def stop(self, tunnel_id):
         with self.lock:
-            r = self.runtime.pop(tunnel_id, None)
+            r = self.runtime.get(tunnel_id)
             if r:
-                r['gost'].stop()
-                for c in r['ssh']:
-                    c.stop()
+                r['stopping'] = True
+                errors = []
+                for child in [r['gost']] + r['ssh']:
+                    try:
+                        child.stop()
+                    except Exception as error:
+                        errors.append(str(error))
+                if errors:
+                    r.update(status='error', healthy=0)
+                    raise RuntimeError('Could not stop all components: ' + '; '.join(errors))
+                self.runtime.pop(tunnel_id, None)
                 self.log('info', 'Port forwarding stopped.', tunnel_id)
+
+    def session_action(self, server_id, action):
+        """Control a Session's own forwarding entries, preserving dependent Sessions."""
+        with self.lock:
+            if not any(s['id'] == server_id for s in self.config['servers']):
+                raise KeyError('Session not found.')
+            if action not in ('connect', 'disconnect', 'reconnect'):
+                raise KeyError('Action not found.')
+            own = [t for t in self.config['tunnels'] if t['server_id'] == server_id]
+            if not own:
+                raise ValueError('This session has no port forwarding entries. Add a port forwarding entry first.')
+            results = []
+            for tunnel in own:
+                result = {'tunnel_id': tunnel['id'], 'name': tunnel['name'], 'ok': True}
+                try:
+                    if action in ('disconnect', 'reconnect'):
+                        self.stop(tunnel['id'])
+                    if action in ('connect', 'reconnect'):
+                        self.start(tunnel['id'])
+                except Exception as error:
+                    # One occupied port or failed process must not roll back other forwards.
+                    result.update(ok=False, error=str(error))
+                    self.log('error', 'Session action failed: ' + str(error), tunnel['id'])
+                results.append(result)
+            succeeded = sum(result['ok'] for result in results)
+            return {'ok': succeeded == len(results), 'server_id': server_id, 'action': action,
+                    'results': results, 'summary': {'requested': len(results), 'succeeded': succeeded,
+                                                  'failed': len(results) - succeeded}}
+
+    def _session_runtime_state(self, server_id, tunnels):
+        """Summarize existing forwarding runtimes; a Session has no separate transport."""
+        own = [t for t in tunnels if t['server_id'] == server_id]
+        active = [t for t in own if t['desired_running']]
+        by_id = {s['id']: s for s in self.config['servers']}
+        dependents = set()
+        for session in self.config['servers']:
+            seen = {session['id']}
+            jump = session.get('jump_id')
+            while jump and jump not in seen and jump in by_id:
+                if jump == server_id:
+                    dependents.add(session['id'])
+                    break
+                seen.add(jump)
+                jump = by_id[jump].get('jump_id')
+        dependent_count = sum(t['server_id'] in dependents and t['desired_running'] for t in tunnels)
+        statuses = set()
+        healthy_forward_count = 0
+        for tunnel in active:
+            status = tunnel['status']
+            healthy_ssh = min(tunnel['healthy_sessions'], tunnel['active_sessions'])
+            if status in ('connected', 'degraded'):
+                if not healthy_ssh:
+                    status = 'starting'
+                else:
+                    healthy_forward_count += 1
+                    if healthy_ssh < tunnel['pool_size']:
+                        status = 'degraded'
+            statuses.add(status)
+        if not active:
+            status = 'in_use_as_firewall' if dependent_count else 'disconnected'
+        elif statuses == {'connected'}:
+            status = 'connected'
+        elif statuses == {'starting'}:
+            status = 'connecting'
+        elif statuses == {'error'}:
+            status = 'error'
+        else:
+            status = 'degraded'
+        return {'connection_status': status, 'own_forward_count': len(own),
+                'active_forward_count': len(active),
+                'healthy_forward_count': healthy_forward_count,
+                'active_ssh_count': sum(t['active_sessions'] for t in active),
+                'healthy_ssh_count': sum(min(t['healthy_sessions'], t['active_sessions']) for t in active),
+                'firewall_in_use': bool(dependent_count), 'dependent_forward_count': dependent_count}
 
     def watch(self):
         while not self.halt.wait(3):
             with self.lock:
                 for tid, r in list(self.runtime.items()):
+                    if r.get('stopping'):
+                        try:
+                            self.stop(tid)
+                        except Exception as error:
+                            self.log('error', 'Could not finish stopping port forwarding: ' + str(error), tid)
+                        continue
                     try:
                         for c in r['ssh']:
                             c.tick()
@@ -434,7 +609,7 @@ class Manager:
                             self.log('error', 'Proxy process error: ' + str(e), tid)
                             r['status'] = 'error'
                             continue
-                        front = r['gost'].proc and r['gost'].proc.poll() is None and port_open(self.tunnel(tid)['local_port'])
+                        front = r['gost'].proc and r['gost'].proc.poll() is None and self.front_probe(self.tunnel(tid)['local_port'])
                         r['status'] = ('connected' if healthy == len(r['ssh']) else 'degraded') if front else 'starting'
                     else:
                         r['status'] = 'error' if blocked else 'starting'
@@ -447,7 +622,7 @@ class Manager:
                 raise ValueError('Connect the port forwarding entry first.')
         kind = 'http' if t['kind'] == 'http' else t.get('probe_type', 'socks' if t['kind'] == 'socks' else 'tcp')
         if kind not in ('http', 'socks'):
-            result = {'ok': port_open(t['local_port']), 'message': 'TCP listener test only; internet access was not checked.', 'time': now()}
+            result = {'ok': self.front_probe(t['local_port']), 'message': 'TCP listener test only; internet access was not checked.', 'time': now()}
         else:
             proxy = ('socks5h' if kind == 'socks' else 'http') + '://127.0.0.1:' + str(t['local_port'])
             args = ['/usr/bin/curl', '--proxy', proxy, '--noproxy', '', '--connect-timeout', '6', '--max-time', '12',
@@ -455,7 +630,10 @@ class Manager:
                     'https://example.com/']
             q = subprocess.run(args, capture_output=True, text=True, timeout=15)
             ok = q.returncode == 0 and q.stdout.startswith('200 ')
-            result = {'ok': ok, 'message': ('Internet access verified: ' if ok else 'Test failed: ') + (q.stdout or q.stderr)[-300:], 'time': now()}
+            details = q.stdout.strip()[-100:]
+            if not ok and q.stderr.strip():
+                details += ('; ' if details else '') + q.stderr.strip()[-500:]
+            result = {'ok': ok, 'message': ('Internet access verified: ' if ok else 'Test failed: ') + details, 'time': now()}
         with self.lock:
             if tid in self.runtime:
                 self.runtime[tid]['last_test'] = result
@@ -482,9 +660,12 @@ class Manager:
                 host = server['host'] if server['port'] == 22 else '[%s]:%s' % (server['host'], server['port'])
                 row['host_key_trusted'] = any(l.split() and host in l.split()[0].split(',') for l in known)
                 row.update({k: bool(self.secret_status.get(server['id'], {}).get(k)) for k in ('has_password', 'has_key_passphrase')})
+                row.update(self._session_runtime_state(server['id'], tunnels))
                 servers.append(row)
             return {'servers': servers, 'tunnels': tunnels, 'logs': list(self.logs),
                     'service': {'version': VERSION, 'port': self.port, 'started_at': self.started_at,
+                                'fd_soft_limit': self.fd_limits['soft'], 'fd_hard_limit': self.fd_limits['hard'],
+                                'fd_limit_warning': self.fd_limits['warning'],
                                 'default_identity_file': self.config.get('default_identity_file', '')},
                     'migration': self.config.get('migration', {})}
 
@@ -509,7 +690,8 @@ class Manager:
             if existing:
                 items.remove(existing)
             if not delete:
-                allowed = {'id', 'name', 'host', 'port', 'username', 'identity_file', 'jump_id', 'auth_mode'} if collection == 'servers' else {
+                allowed = {'id', 'name', 'host', 'port', 'username', 'identity_file', 'jump_id', 'auth_mode',
+                           'keepalive_interval', 'keepalive_count'} if collection == 'servers' else {
                     'id', 'name', 'server_id', 'kind', 'local_port', 'remote_host', 'remote_port', 'pool_size', 'autostart', 'probe_type'}
                 record = dict(existing or {})
                 record.update({k: v for k, v in data.items() if k in allowed})
@@ -654,6 +836,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return self.reply(201, self.manager.mutate(collection, None, data))
                 if len(parts) == 3 and self.command in ('PUT', 'DELETE'):
                     return self.reply(200, self.manager.mutate(collection, parts[2], data, self.command == 'DELETE'))
+                if len(parts) == 4 and collection == 'servers' and self.command == 'POST':
+                    return self.reply(200, self.manager.session_action(parts[2], parts[3]))
                 if len(parts) == 4 and collection == 'tunnels' and self.command == 'POST':
                     tid, action = parts[2:]
                     if action == 'test':

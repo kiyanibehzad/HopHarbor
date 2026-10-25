@@ -8,7 +8,9 @@
       "username": "tunneluser",
       "auth_mode": "agent",
       "identity_file": "",
-      "jump_id": null
+      "jump_id": null,
+      "keepalive_interval": 30,
+      "keepalive_count": 3
     },
     {
       "id": "edge",
@@ -18,7 +20,9 @@
       "username": "tunneluser",
       "auth_mode": "agent",
       "identity_file": "",
-      "jump_id": "gateway"
+      "jump_id": "gateway",
+      "keepalive_interval": 30,
+      "keepalive_count": 3
     }
   ],
   "tunnels": [

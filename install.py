@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import platform
 import plistlib
+import resource
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,31 @@ GOST_SHA256 = '6b87b8c5fd728536d1b208382fc6b93a7bb04111d633a9f1e4651cd1ce62886d'
 
 def run(args, check=True):
     return subprocess.run([str(x) for x in args], check=check)
+
+
+def file_limit_plan(hard_limit, kernel_limit):
+    """Request a larger soft limit without changing the inherited hard limit."""
+    if (isinstance(hard_limit, bool) or not isinstance(hard_limit, int)
+            or isinstance(kernel_limit, bool) or not isinstance(kernel_limit, int)
+            or kernel_limit < 1):
+        return {}
+    ceilings = [8192, kernel_limit]
+    if hard_limit != resource.RLIM_INFINITY:
+        if hard_limit < 1:
+            return {}
+        ceilings.append(hard_limit)
+    return {'SoftResourceLimits': {'NumberOfFiles': min(ceilings)}}
+
+
+def launch_agent_resource_limits():
+    """Discover local ceilings read-only; omit an uncertain launchd setting."""
+    try:
+        _, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        result = subprocess.run(['/usr/sbin/sysctl', '-n', 'kern.maxfilesperproc'],
+                                capture_output=True, text=True, check=True, timeout=5)
+        return file_limit_plan(hard_limit, int(result.stdout.strip()))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
 
 
 def refresh_app_registration(bundle):
@@ -100,6 +126,7 @@ def main():
     (app / 'bin').mkdir(mode=0o700, exist_ok=True)
     provenance = fetch_gost(app / 'bin/gost')
     (app / 'THIRD-PARTY.json').write_text(json.dumps(provenance, indent=2))
+    # The builder preserves an unchanged verified helper and its Keychain access approval.
     run(['/usr/bin/python3', ROOT / 'packaging/build_helper.py', '--output', app / 'bin/keychain-helper'])
     run(['/usr/bin/python3', ROOT / 'packaging/build_app.py', '--output', bundle, '--data-dir', data])
     refresh_app_registration(bundle)
@@ -120,6 +147,7 @@ def main():
         'StandardOutPath': str(logs / 'service.stdout.log'),
         'StandardErrorPath': str(logs / 'service.stderr.log'),
     }
+    definition.update(launch_agent_resource_limits())
     agent.write_bytes(plistlib.dumps(definition))
     agent.chmod(0o600)
     run(['/usr/bin/plutil', '-lint', agent])

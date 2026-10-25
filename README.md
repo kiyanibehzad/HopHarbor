@@ -1,6 +1,6 @@
 # HopHarbor
 
-Version **1.0.0** · build **2**
+Version **1.1.0** · build **3**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
@@ -8,7 +8,23 @@ A lightweight interface for macOS built-in OpenSSH, launchd and Keychain, with S
 
 [فارسی: راهنمای شروع سریع](README.fa.md) · [Source repository](https://github.com/kiyanibehzad/HopHarbor)
 
-HopHarbor separates background SSH connections from its native menu bar panel. It uses the OpenSSH client installed with macOS for SSH, launchd for the user background service, and macOS Keychain for credentials. GOST is an additional, separately downloaded dependency for local HTTP proxying and TCP connection distribution; it is not built into macOS. Closing the panel keeps connections running.
+HopHarbor separates background SSH connections from its native Dock and menu bar panel. It uses the OpenSSH client installed with macOS for SSH, launchd for the user background service, and macOS Keychain for credentials. GOST is an additional, separately downloaded dependency for local HTTP proxying and TCP connection distribution; it is not built into macOS. Closing the panel keeps connections running.
+
+## Screenshots
+
+These screenshots use **synthetic demo data** only. Example names, documentation-only addresses and simulated connection states do not show a personal configuration or live server connections.
+
+### Overview
+
+![HopHarbor Overview with synthetic demo data](docs/images/overview.png)
+
+### Port Forwarding by Session
+
+![HopHarbor port forwarding grouped by example Sessions](docs/images/port-forwarding.png)
+
+### Session controls and status
+
+![HopHarbor Session status and connection controls with synthetic demo data](docs/images/sessions.png)
 
 ## Sessions and Port Forwarding
 
@@ -31,7 +47,7 @@ Each Session may select another Session as its Firewall. Create the intermediary
 - Optional automatic startup and delayed recovery after an SSH process fails.
 - One to four SSH sessions per port forward, distributing new connections across ready sessions.
 - Passwords and private-key passphrases stored through macOS Keychain.
-- A fully local English management panel in a native macOS menu bar app.
+- A fully local English management panel in a native macOS app with Dock and menu bar access.
 
 **A pool is not connection bonding.** One client connection uses one SSH session. A pool can distribute concurrent connections; it does not combine SSH sessions to accelerate one download. Start with one session and increase the count only when your workload benefits. Resource use depends on traffic, encryption, and pool size.
 
@@ -79,7 +95,7 @@ The installer embeds that absolute data-directory path in the signed app's `HopH
 
 ## First Session
 
-1. Open HopHarbor from Applications or the menu bar.
+1. Open HopHarbor from Applications, its Dock icon, or the menu bar.
 2. Add a **Session** with a display name, hostname, SSH port, username, and authentication method.
 3. Add its verified server public host key in the advanced Session settings.
 4. If another SSH server is needed to reach it, create that intermediary Session first and select it as the **Firewall**.
@@ -150,9 +166,19 @@ Keep the existing working path while you test:
 
 If you use a system-wide proxy router, review its rules for SSH processes and their destination servers. Sending a tunnel's own connection back through its proxy can create a loop. HopHarbor does not automatically alter another application's proxy-routing rules.
 
+## Session controls and keepalive
+
+The **Sessions** view shows forwarding status, the count of ready SSH transports, and a separate **Firewall in use** indicator. **Connect**, **Disconnect**, and **Reconnect** apply to the forwarding entries saved under that Session. They do not stop entries belonging to other Sessions, including entries that use this Session as a Firewall. Add a forwarding entry before connecting an otherwise empty Session.
+
+The **Port Forwarding** view groups entries by Session and shows its Firewall route. Search and status filters apply inside those groups.
+
+Each Session has **Keepalive / NO-OP** settings. OpenSSH sends an encrypted server-alive request after the configured interval without receiving traffic. The defaults are 30 seconds and 3 missed replies; interval 0 disables these requests. See the [OpenSSH server-alive settings](https://man.openbsd.org/ssh_config#ServerAliveInterval). This serves the anti-idle and failed-connection detection purpose of SecureCRT's protocol NO-OP, using OpenSSH's own mechanism. Failed SSH processes reconnect with a delay of 5–60 seconds; authentication or host-key errors wait for correction. Enable automatic startup per forwarding entry if it should reconnect after the background service starts.
+
+The installer reuses an unchanged, verified Keychain helper so ordinary interface/controller updates preserve its existing Keychain approval. A changed helper is rebuilt and may require access approval again.
+
 ## Background service and removal
 
-Closing the panel, or choosing **Quit Panel**, leaves the background service running. Use **Disconnect** to stop a particular port forward.
+Closing the panel keeps its Dock icon available; click it to reopen the panel. Choosing **Quit Panel** exits the app interface. Both actions leave the background service running. Use **Disconnect** to stop a particular port forward.
 
 To remove the installed app and user LaunchAgent:
 
@@ -196,3 +222,7 @@ A sanitized development run is recorded in [docs/local-smoke-results.json](docs/
 ## License and third-party components
 
 HopHarbor's original code is MIT-licensed; see [LICENSE](LICENSE). GOST's MIT notice is retained in [vendor/GOST-LICENSE](vendor/GOST-LICENSE). See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and [vendor/provenance.json](vendor/provenance.json) for its pinned release details. Apple frameworks, the system OpenSSH client and Python remain separately licensed installed components.
+
+## Concurrent connections
+
+The user service requests a soft open-file limit of up to 8,192, bounded by macOS and the inherited hard limit. This prevents the small default launchd limit from rejecting new proxy connections under concurrent traffic. Existing higher limits are preserved; hard limits are not lowered. Service status exposes the effective limits for diagnostics.
