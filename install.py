@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Install HopHarbor for the current macOS user, without sudo."""
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent
@@ -83,6 +85,16 @@ def fetch_gost(target):
     return {'name': 'GOST', 'version': GOST_VERSION, 'url': url, 'sha256': GOST_SHA256}
 
 
+@contextmanager
+def prepare_upgrade(target):
+    """Finish the verified download before stopping a service providing Internet."""
+    with tempfile.TemporaryDirectory(prefix='hopharbor-upgrade-') as directory:
+        prepared = Path(directory)
+        provenance = fetch_gost(prepared / 'gost')
+        run(['/bin/launchctl', 'bootout', target], check=False)
+        yield prepared, provenance
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--no-start', action='store_true')
@@ -111,21 +123,24 @@ def main():
     if not Path('/usr/bin/python3').exists() or not Path('/usr/bin/xcrun').exists():
         raise SystemExit('Install Apple Command Line Tools first: xcode-select --install')
     run(['/usr/bin/xcrun', '--find', 'swiftc'])
-    run(['/bin/launchctl', 'bootout', target], check=False)
-    data.mkdir(parents=True, exist_ok=True, mode=0o700)
-    data.chmod(0o700)
-    app = data / 'app'
-    app.mkdir(mode=0o700, exist_ok=True)
-    for name in ('manager.py', 'ssh_hop.py', 'askpass.py'):
-        shutil.copyfile(ROOT / name, app / name)
-        (app / name).chmod(0o700)
-    (app / 'web').mkdir(mode=0o700, exist_ok=True)
-    for name in ('index.html', 'app.js'):
-        shutil.copyfile(ROOT / 'web' / name, app / 'web' / name)
-        (app / 'web' / name).chmod(0o600)
-    (app / 'bin').mkdir(mode=0o700, exist_ok=True)
-    provenance = fetch_gost(app / 'bin/gost')
-    (app / 'THIRD-PARTY.json').write_text(json.dumps(provenance, indent=2))
+    with prepare_upgrade(target) as (prepared, provenance):
+        data.mkdir(parents=True, exist_ok=True, mode=0o700)
+        data.chmod(0o700)
+        app = data / 'app'
+        app.mkdir(mode=0o700, exist_ok=True)
+        for name in ('manager.py', 'ssh_hop.py', 'askpass.py'):
+            shutil.copyfile(ROOT / name, app / name)
+            (app / name).chmod(0o700)
+        (app / 'web').mkdir(mode=0o700, exist_ok=True)
+        for name in ('index.html', 'app.js'):
+            shutil.copyfile(ROOT / 'web' / name, app / 'web' / name)
+            (app / 'web' / name).chmod(0o600)
+        (app / 'bin').mkdir(mode=0o700, exist_ok=True)
+        shutil.copyfile(prepared / 'gost', app / 'bin/gost')
+        (app / 'bin/gost').chmod(0o700)
+        if (prepared / 'GOST-LICENSE').is_file():
+            shutil.copyfile(prepared / 'GOST-LICENSE', app / 'bin/GOST-LICENSE')
+        (app / 'THIRD-PARTY.json').write_text(json.dumps(provenance, indent=2))
     # The builder preserves an unchanged verified helper and its Keychain access approval.
     run(['/usr/bin/python3', ROOT / 'packaging/build_helper.py', '--output', app / 'bin/keychain-helper'])
     run(['/usr/bin/python3', ROOT / 'packaging/build_app.py', '--output', bundle, '--data-dir', data])
