@@ -330,6 +330,31 @@ def main():
                      timeout=20, description='failed SSH pool child to reconnect')
             results['checks'].append({'name': 'one-child-failure-survival-and-reconnect',
                                       'ok': True, 'successful_requests_during_recovery': successes})
+            wait_for(all_ready, description='full pool recovery')
+            if any(row['last_error'] for row in manager.state()['tunnels']):
+                raise RuntimeError('Recovered processes retained an old status error: ' + json.dumps([
+                    {'id': row['id'], 'error': row['last_error']} for row in manager.state()['tunnels']]))
+            results['checks'].append({'name': 'reconnect-clears-stale-status-errors', 'ok': True})
+
+            old_fronts = {tid: manager.runtime[tid]['gost'].proc.pid for tid in expected}
+            old_ssh = {c.proc.pid for tid in expected for c in manager.runtime[tid]['ssh']}
+            wake_started = time.monotonic()
+            # Exercise a confirmed-wake handler with synthetic, loopback-only SSH.
+            # This never puts the Mac to sleep or touches the installed service.
+            manager.recover_after_wake()
+            wait_for(all_ready, timeout=35, description='synthetic wake recovery')
+            if any(manager.runtime[tid]['gost'].proc.pid != pid for tid, pid in old_fronts.items()):
+                raise RuntimeError('Wake recovery replaced a stable proxy frontend')
+            new_ssh = {c.proc.pid for tid in expected for c in manager.runtime[tid]['ssh']}
+            if old_ssh & new_ssh:
+                raise RuntimeError('Wake recovery kept an old SSH transport')
+            if any(row['last_error'] for row in manager.state()['tunnels']):
+                raise RuntimeError('Synthetic wake left stale connection errors')
+            proxy_get('socks5h', socks_port, target + '/after-wake-socks', '/after-wake-socks')
+            proxy_get('http', proxy_port, 'https://127.0.0.1:%s/after-wake-http' % tls_port,
+                      '/after-wake-http', ca)
+            results['checks'].append({'name': 'wake-rebuilds-ssh-and-preserves-proxy-frontends',
+                                      'ok': True, 'recovery_seconds': round(time.monotonic() - wake_started, 2)})
             for tid in list(expected):
                 manager.stop(tid)
             wait_for(lambda: not any(port_open(p) for p in [socks_port, proxy_port, local_port]),

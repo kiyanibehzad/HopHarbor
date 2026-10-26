@@ -25,8 +25,10 @@ import urllib.parse
 import uuid
 
 from log_policy import EventLog, LogMaintenance, install_service_streams
+from wake_monitor import WakeMonitor
 
-VERSION = '1.1.1'
+VERSION = '1.1.2'
+BUILD = 5
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
 
@@ -135,12 +137,19 @@ class Child:
         self.failures = 0
         self.ready = False
         self.error = ''
+        self.error_time = 0
         self.blocked = False
+        self.generation = 0
         self.server_id = server_id
         self.is_gost = (server_id is None and bool(argv) and getattr(manager, 'app', None) is not None
                         and argv[0] == str(manager.app / 'bin/gost'))
 
     def spawn(self):
+        with self.manager.lock:
+            self._spawn()
+
+    def _spawn(self):
+        self.generation += 1
         self.last_start = time.monotonic()
         self.ready = False
         try:
@@ -152,39 +161,62 @@ class Child:
                                          env=env, close_fds=True)
         except OSError as e:
             self.error = 'Could not start component: ' + str(e)
+            self.error_time = time.monotonic()
             self.next_start = time.monotonic() + 60
             self.manager.log('error', self.error, self.tunnel_id)
             return
+        # A new process must not inherit errors or late stderr from its predecessor.
+        self.error = ''
+        self.error_time = 0
+        self.blocked = False
         atomic_json(self.manager.data / 'runtime' / ('child-%s.json' % self.proc.pid),
                     {'pid': self.proc.pid, 'argv': self.argv})
         self.manager.log('info', self.label + ' started.', self.tunnel_id)
-        threading.Thread(target=self.read_log, args=(self.proc,), daemon=True).start()
+        threading.Thread(target=self.read_log, args=(self.proc, self.generation), daemon=True).start()
 
-    def read_log(self, proc):
+    def read_log(self, proc, generation=None):
+        if generation is None:
+            generation = self.generation
         for raw in iter(lambda: proc.stdout.readline(4096), b''):
             line = raw.decode('utf-8', 'replace').strip()[:1200]
             if not line:
                 continue
             if self.is_gost and self.manager.is_front_probe_eof(line):
                 continue
+            request_error = False
             if self.is_gost:
                 try:
                     details = json.loads(line)
                     if isinstance(details, dict) and isinstance(details.get('msg'), str):
                         line = details['msg']
+                        # A failed client request is history, not a broken SSH component.
+                        # Listener/startup/fatal errors still need persistent attention.
+                        request_error = ((details.get('kind') in ('handler', 'dialer', 'connector')
+                                          or (details.get('kind') == 'service'
+                                              and isinstance(details.get('sid'), str) and bool(details['sid'])))
+                                         and details.get('level') != 'fatal')
                 except (ValueError, TypeError):
                     pass
             line = line[:800]
             # OpenSSH and GOST never receive a password through argv/config here.
-            self.error = line
-            if any(x in line.lower() for x in ('permission denied', 'host key verification failed',
-                                               'remote host identification has changed',
-                                               'invalid format', 'no such identity')):
-                self.blocked = True
-            self.manager.log('error', self.label + ': ' + line, self.tunnel_id)
+            with self.manager.lock:
+                if generation != self.generation:
+                    continue
+                if not request_error:
+                    self.error = line
+                    self.error_time = time.monotonic()
+                    if any(x in line.lower() for x in ('permission denied', 'host key verification failed',
+                                                       'remote host identification has changed',
+                                                       'invalid format', 'no such identity')):
+                        self.blocked = True
+                self.manager.log('error', self.label + ': ' + line, self.tunnel_id)
         proc.stdout.close()
 
     def tick(self):
+        with self.manager.lock:
+            self._tick()
+
+    def _tick(self):
         t = time.monotonic()
         if self.proc and self.proc.poll() is not None:
             code = self.proc.returncode
@@ -195,10 +227,16 @@ class Child:
             self.next_start = t + min(60, 5 * (2 ** min(self.failures - 1, 4)))
             if code and not self.error:
                 self.error = 'Process exited with code %s.' % code
+                self.error_time = t
+                self.manager.log('error', self.label + ': ' + self.error, self.tunnel_id)
         if not self.proc and not self.blocked and t >= self.next_start:
             self.spawn()
 
-    def stop(self):
+    def stop(self, timeout=4):
+        with self.manager.lock:
+            self._stop(timeout)
+
+    def _stop(self, timeout):
         p = self.proc
         self.ready = False
         if p and p.poll() is None:
@@ -207,7 +245,7 @@ class Child:
             except ProcessLookupError:
                 pass
             try:
-                p.wait(timeout=4)
+                p.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 try:
                     os.killpg(p.pid, signal.SIGKILL)
@@ -215,6 +253,7 @@ class Child:
                     pass
                 p.wait(timeout=2)
         # Preserve ownership if terminating/waiting raised an error.
+        self.generation += 1
         self.proc = None
         if p:
             (self.manager.data / 'runtime' / ('child-%s.json' % p.pid)).unlink(missing_ok=True)
@@ -255,6 +294,7 @@ class Manager:
         self.front_probe_lock = threading.Lock()
         self.front_probes = {}
         self.halt = threading.Event()
+        self.wake_monitor = WakeMonitor()
         self.child_env = dict(os.environ)
         self.child_env['LC_ALL'] = 'C'
         self.child_env['SSH_ASKPASS'] = str(self.app / 'askpass.py')
@@ -613,9 +653,33 @@ class Manager:
                 'healthy_ssh_count': sum(min(t['healthy_sessions'], t['active_sessions']) for t in active),
                 'firewall_in_use': bool(dependent_count), 'dependent_forward_count': dependent_count}
 
+    def recover_after_wake(self):
+        """Rebuild stale transports once per confirmed kernel wake, on the same ports."""
+        with self.lock:
+            active = [r for r in self.runtime.values() if not r.get('stopping')]
+            if not active:
+                return
+            self.log('info', 'Mac woke from sleep; refreshing active SSH connections.')
+            for tid, r in list(self.runtime.items()):
+                if r.get('stopping'):
+                    continue
+                r.update(status='starting', healthy=0, last_test=None)
+                for c in r['ssh']:
+                    # Credential/host-key failures require correction, even after sleep.
+                    if c.blocked:
+                        continue
+                    try:
+                        c.stop(timeout=.5)
+                        c.failures = 0
+                        c.next_start = 0
+                    except Exception as error:
+                        self.log('error', 'Could not refresh SSH connection: ' + str(error), tid)
+
     def watch(self):
         while not self.halt.wait(3):
             with self.lock:
+                if self.wake_monitor.resumed():
+                    self.recover_after_wake()
                 if time.monotonic() >= self.next_maintenance:
                     self.next_maintenance = time.monotonic() + 60
                     try:
@@ -639,6 +703,8 @@ class Manager:
                     healthy = sum(bool(c.proc and c.proc.poll() is None and port_open(p))
                                   for c, p in zip(r['ssh'], r['ports']))
                     r['healthy'] = healthy
+                    if healthy < len(r['ssh']):
+                        r['last_test'] = None
                     blocked = any(c.blocked for c in r['ssh'])
                     if healthy:
                         try:
@@ -684,12 +750,13 @@ class Manager:
             for t in self.config['tunnels']:
                 row = dict(t)
                 r = self.runtime.get(t['id'])
-                errors = [c.error for c in r['ssh'] + [r['gost']] if c.error] if r else []
+                errors = [c for c in r['ssh'] + [r['gost']] if c.error] if r else []
+                latest_error = max(errors, key=lambda c: getattr(c, 'error_time', 0)).error if errors else ''
                 row.update(status=r['status'] if r else 'stopped', desired_running=bool(r),
                            healthy_sessions=r['healthy'] if r else 0,
                            active_sessions=sum(bool(c.proc and c.proc.poll() is None) for c in r['ssh']) if r else 0,
                            connections=None, pid=r['gost'].proc.pid if r and r['gost'].proc else None,
-                           last_error=errors[-1] if errors else '', last_test=r['last_test'] if r else None)
+                           last_error=latest_error, last_test=r['last_test'] if r else None)
                 tunnels.append(row)
             known = (self.data / 'known_hosts').read_text().splitlines()
             servers = []
@@ -701,7 +768,7 @@ class Manager:
                 row.update(self._session_runtime_state(server['id'], tunnels))
                 servers.append(row)
             return {'servers': servers, 'tunnels': tunnels, 'logs': self.logs.snapshot(),
-                    'service': {'version': VERSION, 'port': self.port, 'started_at': self.started_at,
+                    'service': {'version': VERSION, 'build': BUILD, 'port': self.port, 'started_at': self.started_at,
                                 'fd_soft_limit': self.fd_limits['soft'], 'fd_hard_limit': self.fd_limits['hard'],
                                 'fd_limit_warning': self.fd_limits['warning'],
                                 'log_policy': {'retention': 'local-day', 'max_events': 200,

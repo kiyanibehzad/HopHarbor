@@ -56,6 +56,7 @@ def bare_manager(data, config=None):
     m.front_probe_lock = threading.Lock()
     m.front_probes = {}
     m.halt = threading.Event()
+    m.wake_monitor = mock.Mock(resumed=mock.Mock(return_value=False))
     m.child_env = dict(os.environ)
     m.cookies = {}
     m.secret_status = {}
@@ -160,6 +161,7 @@ class ValidationTests(unittest.TestCase):
 
 class FakeManager:
     def __init__(self):
+        self.lock = threading.RLock()
         self.port = None
         self.token = 'test-only-token-that-never-authenticates-a-real-service'
         self.cookies = {}

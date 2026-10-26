@@ -1,6 +1,6 @@
 # HopHarbor
 
-Version **1.1.1** · build **4**
+Version **1.1.2** · build **5**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
@@ -150,7 +150,9 @@ Status distinguishes stopped, starting, connected, degraded, and error states. C
 
 For a generic TCP forward, a listener test verifies only that the local port accepts a connection. It cannot establish the health of an arbitrary application beyond that port; the test result states this limitation.
 
-SSH keepalives detect an unresponsive SSH connection. Failed processes restart with a delay; authentication and host-key failures need correction instead of rapid endless retries. Recovery after sleep or network changes can take time, and existing client connections may need to reconnect.
+SSH keepalives detect an unresponsive SSH connection. Failed processes restart with a delay; authentication and host-key failures need correction instead of rapid endless retries. The background service checks macOS's kernel wake timestamp every three seconds. After a confirmed sleep/wake, it refreshes active SSH transports on their existing local ports and resets their retry delay, rather than waiting for old sockets to time out. Stopped forwards stay stopped, credential and host-key blocks remain, and the proxy frontend stays running. Network availability and authentication still affect recovery time; existing client connections may need to reconnect.
+
+Errors belong to the process that produced them: a successfully started replacement clears its predecessor's status error, and late output from that predecessor cannot overwrite the new state. Client-request errors from the proxy are recorded in today's bounded **Logs** history, separate from persistent component/startup errors. Recovery does not erase that history.
 
 Disconnect a forward before editing it. Stop dependent forwards before changing a Session in their route. Deleting a referenced Session is rejected.
 

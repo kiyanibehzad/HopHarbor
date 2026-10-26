@@ -42,10 +42,19 @@
       "successful_requests_during_recovery": 2
     },
     {
+      "name": "reconnect-clears-stale-status-errors",
+      "ok": true
+    },
+    {
+      "name": "wake-rebuilds-ssh-and-preserves-proxy-frontends",
+      "ok": true,
+      "recovery_seconds": 6.14
+    },
+    {
       "name": "stop-releases-all-test-listeners",
       "ok": true
     }
   ],
   "ok": true,
-  "duration_seconds": 15.75
+  "duration_seconds": 25.03
 }

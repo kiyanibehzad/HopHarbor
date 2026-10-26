@@ -61,14 +61,15 @@ class FrontProbeTests(unittest.TestCase):
         self.assertEqual(child.error, 'Earlier real upstream failure')
         self.assertFalse(self.manager.logs)
 
-    def test_real_client_eof_and_other_errors_stay_visible(self):
+    def test_request_errors_remain_in_history_and_component_errors_remain_in_status(self):
         cases = [
             self.line(remote='127.0.0.1:50221', client='127.0.0.1:50221'),
             self.line(local='127.0.0.1:1861'),
             self.line(client='127.0.0.1:50221'),
-            self.line(msg='listen tcp 127.0.0.1:1860: bind: address already in use'),
+            self.line(kind='listener', msg='listen tcp 127.0.0.1:1860: bind: address already in use'),
             self.line(msg='upstream EOF'),
             self.line(kind='dialer'),
+            self.line(kind='service', sid='synthetic-request-id'),
             'EOF',
         ]
         for line in cases:
@@ -78,14 +79,19 @@ class FrontProbeTests(unittest.TestCase):
                 child = self.child()
                 self.read(child, line)
                 expected = json.loads(line)['msg'] if line.startswith('{') else line
-                self.assertEqual(child.error, expected)
+                details = json.loads(line) if line.startswith('{') else {}
+                request_error = (details.get('kind') in ('handler', 'dialer', 'connector')
+                                 or details.get('kind') == 'service' and bool(details.get('sid')))
+                self.assertEqual(child.error, '' if request_error else expected)
                 self.assertEqual(len(self.manager.logs), 1)
+                self.assertIn(expected, list(self.manager.logs)[0]['message'])
 
     def test_old_probe_and_non_owned_process_eof_are_never_filtered(self):
         self.record_probe(age=6)
         child = self.child()
         self.read(child, self.line())
-        self.assertEqual(child.error, 'EOF')
+        self.assertEqual(child.error, '')
+        self.assertEqual(len(self.manager.logs), 1)
         for argv, server_id in [(['/usr/bin/ssh'], 'test_only_session'),
                                 (['/different/installation/bin/gost'], None)]:
             with self.subTest(argv=argv):
@@ -131,10 +137,11 @@ class FrontProbeTests(unittest.TestCase):
             with socket.create_connection(('127.0.0.1', port), timeout=.2) as client:
                 client_address = '%s:%s' % client.getsockname()[:2]
             deadline = time.monotonic() + 2
-            while not child.error:
+            while not any(log['level'] == 'error' for log in self.manager.logs):
                 self.assertLess(time.monotonic(), deadline, 'A real client EOF was incorrectly filtered')
                 time.sleep(.02)
-            self.assertEqual(child.error, 'EOF')
+            self.assertEqual(child.error, '')
+            self.assertIn('EOF', list(self.manager.logs)[-1]['message'])
             self.assertNotIn(client_address, list(self.manager.logs)[-1]['message'])
             real_error = child.error
             self.assertTrue(self.manager.front_probe(port))
@@ -155,6 +162,16 @@ class FrontProbeTests(unittest.TestCase):
         self.assertEqual(rows[0]['repeats'], 2)
         self.assertEqual(rows[0]['message'], 'Test proxy: Upstream unavailable')
         self.assertNotIn('50229', rows[0]['message'])
+
+    def test_request_auth_error_does_not_block_the_proxy_but_fatal_and_bind_errors_persist(self):
+        child = self.child()
+        self.read(child, self.line(msg='Permission denied by upstream proxy'))
+        self.assertEqual(child.error, '')
+        self.assertFalse(child.blocked)
+        self.read(child, self.line(kind='listener', msg='bind: address already in use'))
+        self.assertEqual(child.error, 'bind: address already in use')
+        self.read(child, self.line(kind='handler', level='fatal', msg='Test fatal component failure'))
+        self.assertEqual(child.error, 'Test fatal component failure')
 
 
 if __name__ == '__main__':
