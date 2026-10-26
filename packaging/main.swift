@@ -32,15 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            if let iconURL = Bundle.main.url(forResource: "HopHarbor", withExtension: "icns"),
-               let icon = NSImage(contentsOf: iconURL) {
-                icon.size = NSSize(width: 18, height: 18)
-                icon.isTemplate = false
-                button.image = icon
-            } else {
-                button.image = NSImage(systemSymbolName: "network", accessibilityDescription: "HopHarbor")
-                button.image?.isTemplate = true
-            }
+            button.image = makeMenuBarIcon()
             button.setAccessibilityLabel("HopHarbor")
             button.toolTip = "HopHarbor — connections run independently of the panel"
         }
@@ -62,6 +54,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
+    }
+
+    private func makeMenuBarIcon() -> NSImage {
+        // The app icon's H glyph, without its colored tile. macOS tints the alpha mask.
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+            let piers = NSBezierPath()
+            piers.lineWidth = 2.4375
+            piers.lineCapStyle = .round
+            for x in [CGFloat(3), CGFloat(15)] {
+                piers.move(to: NSPoint(x: x, y: 2.875))
+                piers.line(to: NSPoint(x: x, y: 15.125))
+            }
+            piers.stroke()
+            let bridge = NSBezierPath()
+            bridge.lineWidth = 2.25
+            bridge.lineCapStyle = .round
+            bridge.move(to: NSPoint(x: 3, y: 7.8125))
+            bridge.curve(to: NSPoint(x: 15, y: 7.8125),
+                         controlPoint1: NSPoint(x: 6.125, y: 11.5625),
+                         controlPoint2: NSPoint(x: 11.875, y: 11.5625))
+            bridge.stroke()
+            for x in [CGFloat(3), CGFloat(15)] {
+                for y in [CGFloat(2.875), CGFloat(15.125)] {
+                    NSBezierPath(ovalIn: NSRect(x: x - 1.6875, y: y - 1.6875,
+                                               width: 3.375, height: 3.375)).fill()
+                }
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     private func buildWindow() {

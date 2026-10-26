@@ -27,8 +27,8 @@ import uuid
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
 
-VERSION = '1.1.3'
-BUILD = 6
+VERSION = '1.1.4'
+BUILD = 7
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
 
