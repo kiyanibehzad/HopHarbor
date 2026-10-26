@@ -1,6 +1,6 @@
 # HopHarbor
 
-Version **1.1.2** · build **5**
+Version **1.1.3** · build **6**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
@@ -180,7 +180,9 @@ The installer reuses an unchanged, verified Keychain helper so ordinary interfac
 
 ## Background service and removal
 
-Closing the panel keeps its Dock icon available; click it to reopen the panel. Choosing **Quit Panel** exits the app interface. Both actions leave the background service running. Use **Disconnect** to stop a particular port forward.
+Closing the panel keeps its Dock icon available; click it to reopen the panel. Choosing **Quit** from the Dock, pressing **Command-Q**, or choosing **Keep in Menu Bar** hides the panel and its running Dock icon while keeping the HopHarbor menu bar icon available. The menu bar uses the same HopHarbor icon as the app. Choose **Open HopHarbor** from that icon to restore the panel and Dock access. The hidden panel releases its web view and stops polling for status.
+
+Choose **Quit Menu Bar App** to exit the interface and remove its menu bar icon. All of these actions leave the background SSH service running. Use **Disconnect** to stop a particular port forward. macOS logout, restart, and shutdown are allowed to terminate the interface normally.
 
 To remove the installed app and user LaunchAgent:
 

@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Foundation
 import WebKit
 
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var rootView: NSView!
     private var webView: WKWebView?
     private var activePort: Int?
+    private var allowTermination = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -30,8 +32,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "network", accessibilityDescription: "HopHarbor")
-            button.image?.isTemplate = true
+            if let iconURL = Bundle.main.url(forResource: "HopHarbor", withExtension: "icns"),
+               let icon = NSImage(contentsOf: iconURL) {
+                icon.size = NSSize(width: 18, height: 18)
+                icon.isTemplate = false
+                button.image = icon
+            } else {
+                button.image = NSImage(systemSymbolName: "network", accessibilityDescription: "HopHarbor")
+                button.image?.isTemplate = true
+            }
+            button.setAccessibilityLabel("HopHarbor")
             button.toolTip = "HopHarbor — connections run independently of the panel"
         }
         let menu = NSMenu()
@@ -45,7 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let hint = NSMenuItem(title: "Closing this panel keeps connections running", action: nil, keyEquivalent: "")
         hint.isEnabled = false
         menu.addItem(hint)
-        let quit = NSMenuItem(title: "Quit Panel", action: #selector(quitPanel(_:)), keyEquivalent: "q")
+        let keep = NSMenuItem(title: "Keep in Menu Bar", action: #selector(keepInMenuBar(_:)), keyEquivalent: "q")
+        keep.target = self
+        menu.addItem(keep)
+        let quit = NSMenuItem(title: "Quit Menu Bar App", action: #selector(quitMenuBarApp(_:)), keyEquivalent: "")
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
@@ -72,9 +85,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func buildApplicationMenu() {
         let bar = NSMenu()
         let appMenu = NSMenu(title: "HopHarbor")
-        let quit = NSMenuItem(title: "Quit Panel", action: #selector(quitPanel(_:)), keyEquivalent: "q")
-        quit.target = self
-        appMenu.addItem(quit)
+        let keep = NSMenuItem(title: "Keep in Menu Bar", action: #selector(keepInMenuBar(_:)), keyEquivalent: "q")
+        keep.target = self
+        appMenu.addItem(keep)
         let appItem = NSMenuItem()
         appItem.submenu = appMenu
         bar.addItem(appItem)
@@ -100,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     @objc private func showPanel(_ sender: Any?) {
+        NSApp.setActivationPolicy(.regular)
         if webView == nil { loadPanel() }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -107,14 +121,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     @objc private func reloadPanel(_ sender: Any?) {
         discardPage()
-        loadPanel()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        showPanel(sender)
     }
 
-    @objc private func quitPanel(_ sender: Any?) {
+    @objc private func keepInMenuBar(_ sender: Any?) {
         discardPage()
+        window.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    @objc private func quitMenuBarApp(_ sender: Any?) {
+        allowTermination = true
         NSApp.terminate(nil)
+    }
+
+    private func isSystemQuitEvent(_ event: NSAppleEventDescriptor?) -> Bool {
+        guard let event = event,
+              event.eventClass == AEEventClass(kCoreEventClass),
+              event.eventID == AEEventID(kAEQuitApplication),
+              let reason = event.paramDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue else {
+            return false
+        }
+        return [OSType(kAEQuitAll), OSType(kAEShutDown), OSType(kAERestart),
+                OSType(kAEReallyLogOut), OSType(kAELogOut)].contains(reason)
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // System session termination must never be vetoed by the menu bar behavior.
+        if allowTermination || isSystemQuitEvent(NSAppleEventManager.shared().currentAppleEvent) {
+            discardPage()
+            return .terminateNow
+        }
+        keepInMenuBar(nil)
+        return .terminateCancel
     }
 
     private func controlURL() -> URL {
@@ -162,6 +201,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         guard let url = components.url else { return }
 
         let configuration = WKWebViewConfiguration()
+        let version = [
+            "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
+            "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: version, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            let literal = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "window.HopHarborNativeVersion = " + literal + ";",
+                injectionTime: .atDocumentStart, forMainFrameOnly: true
+            ))
+        }
         configuration.websiteDataStore = .default()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let browser = WKWebView(frame: .zero, configuration: configuration)
