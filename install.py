@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent
@@ -24,6 +25,23 @@ GOST_SHA256 = '6b87b8c5fd728536d1b208382fc6b93a7bb04111d633a9f1e4651cd1ce62886d'
 
 def run(args, check=True):
     return subprocess.run([str(x) for x in args], check=check)
+
+
+def bootstrap_service(domain, agent):
+    """Allow launchd's transient exit 5 to settle, with five seconds of retry delays."""
+    command = ['/bin/launchctl', 'bootstrap', domain, str(agent)]
+    for delay in (0, .5, 1, 1.5, 2):
+        if delay:
+            time.sleep(delay)
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=10)
+        if result.returncode != 5:
+            break
+    if result.stdout:
+        sys.stdout.write(result.stdout)
+    if result.stderr:
+        sys.stderr.write(result.stderr)
+    result.check_returncode()
+    return result
 
 
 def file_limit_plan(hard_limit, kernel_limit):
@@ -128,7 +146,7 @@ def main():
         data.chmod(0o700)
         app = data / 'app'
         app.mkdir(mode=0o700, exist_ok=True)
-        for name in ('manager.py', 'ssh_hop.py', 'askpass.py'):
+        for name in ('manager.py', 'ssh_hop.py', 'askpass.py', 'log_policy.py'):
             shutil.copyfile(ROOT / name, app / name)
             (app / name).chmod(0o700)
         (app / 'web').mkdir(mode=0o700, exist_ok=True)
@@ -159,15 +177,16 @@ def main():
         'ProgramArguments': ['/usr/bin/python3', str(app / 'manager.py'), '--data-dir', str(data), '--app-dir', str(app), '--port', '17777'],
         'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 10,
         'ProcessType': 'Background', 'LowPriorityIO': True, 'Umask': 63,
-        'StandardOutPath': str(logs / 'service.stdout.log'),
-        'StandardErrorPath': str(logs / 'service.stderr.log'),
+        # The controller installs its own bounded streams; inherited FD writes are discarded.
+        'StandardOutPath': '/dev/null',
+        'StandardErrorPath': '/dev/null',
     }
     definition.update(launch_agent_resource_limits())
     agent.write_bytes(plistlib.dumps(definition))
     agent.chmod(0o600)
     run(['/usr/bin/plutil', '-lint', agent])
     if not args.no_start:
-        run(['/bin/launchctl', 'bootstrap', 'gui/%s' % os.getuid(), agent])
+        bootstrap_service('gui/%s' % os.getuid(), agent)
     print('Installed:', bundle)
     print('Private configuration:', data)
     print('Background service:', agent)

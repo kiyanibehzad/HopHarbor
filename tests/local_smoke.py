@@ -16,6 +16,7 @@ import signal
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -24,6 +25,8 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 RESULT_PATH = ROOT / 'tests' / 'local-smoke-results.json'
 SPEC = importlib.util.spec_from_file_location('hopharbor_local_smoke', ROOT / 'manager.py')
 pm = importlib.util.module_from_spec(SPEC)

@@ -77,14 +77,15 @@ class FrontProbeTests(unittest.TestCase):
                 self.record_probe()
                 child = self.child()
                 self.read(child, line)
-                self.assertEqual(child.error, line)
+                expected = json.loads(line)['msg'] if line.startswith('{') else line
+                self.assertEqual(child.error, expected)
                 self.assertEqual(len(self.manager.logs), 1)
 
     def test_old_probe_and_non_owned_process_eof_are_never_filtered(self):
         self.record_probe(age=6)
         child = self.child()
         self.read(child, self.line())
-        self.assertEqual(child.error, self.line())
+        self.assertEqual(child.error, 'EOF')
         for argv, server_id in [(['/usr/bin/ssh'], 'test_only_session'),
                                 (['/different/installation/bin/gost'], None)]:
             with self.subTest(argv=argv):
@@ -133,10 +134,8 @@ class FrontProbeTests(unittest.TestCase):
             while not child.error:
                 self.assertLess(time.monotonic(), deadline, 'A real client EOF was incorrectly filtered')
                 time.sleep(.02)
-            record = json.loads(child.error)
-            self.assertEqual(record['msg'], 'EOF')
-            self.assertEqual(record['remote'], client_address)
-            self.assertEqual(record['local'], '127.0.0.1:' + str(port))
+            self.assertEqual(child.error, 'EOF')
+            self.assertNotIn(client_address, list(self.manager.logs)[-1]['message'])
             real_error = child.error
             self.assertTrue(self.manager.front_probe(port))
             time.sleep(.1)
@@ -145,6 +144,17 @@ class FrontProbeTests(unittest.TestCase):
         finally:
             child.stop()
         self.assertFalse(pm.port_open(port))
+
+    def test_gost_error_metadata_does_not_defeat_repeat_collapsing(self):
+        child = self.child()
+        self.read(child, self.line(msg='Upstream unavailable', time='2026-01-01T00:00:01Z'),
+                  self.line(msg='Upstream unavailable', time='2026-01-01T00:00:02Z',
+                            remote='127.0.0.1:50229'))
+        rows = list(self.manager.logs)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['repeats'], 2)
+        self.assertEqual(rows[0]['message'], 'Test proxy: Upstream unavailable')
+        self.assertNotIn('50229', rows[0]['message'])
 
 
 if __name__ == '__main__':

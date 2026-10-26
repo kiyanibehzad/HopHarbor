@@ -1,5 +1,4 @@
 """Local-only controller boundary tests; never starts SSH or contacts a server."""
-import collections
 import copy
 import http.client
 import importlib.util
@@ -7,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -15,6 +15,8 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 SPEC = importlib.util.spec_from_file_location('proxy_manager_review', ROOT / 'manager.py')
 pm = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pm)
@@ -46,7 +48,9 @@ def bare_manager(data, config=None):
     m.lock = threading.RLock()
     m.config = copy.deepcopy(config or base_config())
     m.config_path = m.data / 'config.json'
-    m.logs = collections.deque(maxlen=300)
+    m.logs = pm.EventLog()
+    m.log_maintenance = pm.LogMaintenance(m.logs, ())
+    m.next_maintenance = 0
     m.fd_limits = {'soft': 8192, 'hard': 65536, 'warning': ''}
     m.runtime = {}
     m.front_probe_lock = threading.Lock()

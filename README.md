@@ -1,6 +1,6 @@
 # HopHarbor
 
-Version **1.1.0** · build **3**
+Version **1.1.1** · build **4**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
@@ -187,6 +187,14 @@ python3 install.py --uninstall
 ```
 
 Use the same `--data-dir` value if you installed with a custom location. Uninstall preserves private configuration and Keychain items.
+
+## Logs and retention
+
+The **Logs** view keeps only the current local calendar day's latest **200 events** in memory. Duplicate events are collapsed within **30 seconds**, with an occurrence count shown beside the message. Event messages are limited to **800 characters**.
+
+The two service output files are each capped at **256 KiB** (**512 KiB total**). Before a write would exceed the limit, that file is truncated; no archives are kept. Prior-day content is cleared at startup and after local midnight, with an idle check every **60 seconds**.
+
+These are connection and error diagnostics, not traffic or access logs. Error diagnostics may contain server or destination addresses; review them before sharing.
 
 ## Configuration and privacy
 

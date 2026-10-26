@@ -2,7 +2,6 @@
 """Local-only controller. OpenSSH carries SSH; GOST handles proxy frontends."""
 import argparse
 import base64
-import collections
 import datetime
 import fcntl
 import hashlib
@@ -25,7 +24,9 @@ import time
 import urllib.parse
 import uuid
 
-VERSION = '1.1.0'
+from log_policy import EventLog, LogMaintenance, install_service_streams
+
+VERSION = '1.1.1'
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
 
@@ -166,6 +167,14 @@ class Child:
                 continue
             if self.is_gost and self.manager.is_front_probe_eof(line):
                 continue
+            if self.is_gost:
+                try:
+                    details = json.loads(line)
+                    if isinstance(details, dict) and isinstance(details.get('msg'), str):
+                        line = details['msg']
+                except (ValueError, TypeError):
+                    pass
+            line = line[:800]
             # OpenSSH and GOST never receive a password through argv/config here.
             self.error = line
             if any(x in line.lower() for x in ('permission denied', 'host key verification failed',
@@ -212,7 +221,7 @@ class Child:
 
 
 class Manager:
-    def __init__(self, data_dir, app_dir, port):
+    def __init__(self, data_dir, app_dir, port, service_streams=()):
         # Do this before spawning managed children or reader/monitor threads.
         self.fd_limits = raise_file_limit(kernel_ceiling=kernel_file_limit())
         self.data = Path(data_dir).resolve()
@@ -237,7 +246,9 @@ class Manager:
         self.token = json.loads(control.read_text())['token'] if control.exists() else secrets.token_urlsafe(48)
         atomic_json(control, {'port': port, 'token': self.token})
         self.cookies = {}
-        self.logs = collections.deque(maxlen=300)
+        self.logs = EventLog()
+        self.log_maintenance = LogMaintenance(self.logs, service_streams)
+        self.next_maintenance = 0
         if self.fd_limits['warning']:
             self.log('error', 'Could not raise the open-file limit: ' + self.fd_limits['warning'])
         self.runtime = {}
@@ -283,6 +294,27 @@ class Manager:
         with self.lock:
             self.logs.append({'time': now(), 'level': level, 'message': message,
                               'tunnel_id': tunnel_id})
+
+    def maintain_local_files(self):
+        """Bound diagnostics and discard only inactive, app-generated proxy configs."""
+        self.log_maintenance.maintenance(force=True)
+        for path in (self.data / 'runtime').glob('*.json'):
+            ident = path.stem
+            if (ident in self.runtime or ident.startswith('child-')
+                    or not ID_RE.fullmatch(ident) or path.is_symlink()):
+                continue
+            try:
+                if not path.is_file() or path.stat().st_size > 65536:
+                    continue
+                config = json.loads(path.read_text())
+                services = config.get('services') if isinstance(config, dict) else None
+                if (isinstance(services, list) and len(services) == 1
+                        and isinstance(services[0], dict) and services[0].get('name') == ident
+                        and config.get('log') == {'level': 'error', 'output': 'stderr'}
+                        and str(services[0].get('addr', '')).startswith('127.0.0.1:')):
+                    path.unlink(missing_ok=True)
+            except (OSError, ValueError):
+                continue
 
     def front_probe(self, port):
         """Check a frontend listener and record this exact empty TCP connection."""
@@ -584,6 +616,12 @@ class Manager:
     def watch(self):
         while not self.halt.wait(3):
             with self.lock:
+                if time.monotonic() >= self.next_maintenance:
+                    self.next_maintenance = time.monotonic() + 60
+                    try:
+                        self.maintain_local_files()
+                    except Exception:
+                        self.log('warning', 'Local diagnostic cleanup could not finish; it will retry.')
                 for tid, r in list(self.runtime.items()):
                     if r.get('stopping'):
                         try:
@@ -662,10 +700,14 @@ class Manager:
                 row.update({k: bool(self.secret_status.get(server['id'], {}).get(k)) for k in ('has_password', 'has_key_passphrase')})
                 row.update(self._session_runtime_state(server['id'], tunnels))
                 servers.append(row)
-            return {'servers': servers, 'tunnels': tunnels, 'logs': list(self.logs),
+            return {'servers': servers, 'tunnels': tunnels, 'logs': self.logs.snapshot(),
                     'service': {'version': VERSION, 'port': self.port, 'started_at': self.started_at,
                                 'fd_soft_limit': self.fd_limits['soft'], 'fd_hard_limit': self.fd_limits['hard'],
                                 'fd_limit_warning': self.fd_limits['warning'],
+                                'log_policy': {'retention': 'local-day', 'max_events': 200,
+                                               'max_message_chars': 800, 'repeat_window_seconds': 30,
+                                               'disk_file_bytes': 262144, 'disk_files': 2,
+                                               'cleanup_interval_seconds': 60, 'archives': 0},
                                 'default_identity_file': self.config.get('default_identity_file', '')},
                     'migration': self.config.get('migration', {})}
 
@@ -872,10 +914,15 @@ def main():
     p.add_argument('--port', type=int, default=17777)
     a = p.parse_args()
     os.umask(0o077)
+    data_dir = Path(a.data_dir).expanduser().resolve()
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    data_dir.chmod(0o700)
+    streams = install_service_streams(data_dir / 'logs')
+    sys.stdout, sys.stderr = streams
     httpd = http.server.ThreadingHTTPServer(('127.0.0.1', a.port), Handler)
     httpd.daemon_threads = True
     try:
-        manager = Manager(a.data_dir, a.app_dir, a.port)
+        manager = Manager(a.data_dir, a.app_dir, a.port, service_streams=streams)
     except Exception:
         httpd.server_close()
         raise
