@@ -1,16 +1,27 @@
 # HopHarbor
 
-Version **1.1.4** · build **7**
+Ubuntu **1.2.0** · build **8** | macOS **1.1.4** · build **7**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
-A lightweight interface for macOS built-in OpenSSH, launchd and Keychain, with SOCKS/HTTP port forwarding and multi-session pools.
+A lightweight interface for the operating system’s OpenSSH client, with SOCKS/HTTP port forwarding and multi-session pools on macOS and Ubuntu 26.04 LTS.
 
 [فارسی: راهنمای شروع سریع](README.fa.md) · [Source repository](https://github.com/kiyanibehzad/HopHarbor)
 
 HopHarbor separates background SSH connections from its native Dock and menu bar panel. It uses the OpenSSH client installed with macOS for SSH, launchd for the user background service, and macOS Keychain for credentials. GOST is an additional, separately downloaded dependency for local HTTP proxying and TCP connection distribution; it is not built into macOS. Closing the panel keeps connections running.
 
+## Ubuntu 26.04 LTS
+
+The Ubuntu edition uses the same local management panel and SSH forwarding engine. It replaces macOS launchd with a per-user systemd service, Keychain with GNOME Keyring / Secret Service, and the macOS window with GTK/WebKitGTK and an application indicator. It supports amd64 and arm64; Linux packages contain no personal Sessions, credentials, or keys.
+
+See **[Ubuntu installation and usage](docs/ubuntu.md)** for `.deb` installation, dependencies, startup, keyring unlocking, and removal. The instructions below this section describe the macOS edition. A closed Ubuntu panel leaves the user service and active forwards running.
+
 ## Screenshots
+
+### Ubuntu 26.04 · Dark appearance
+
+![Ubuntu panel with an empty synthetic test configuration](docs/images/ubuntu-overview.png)
+
 
 These screenshots use **synthetic demo data** only. Example names, documentation-only addresses and simulated connection states do not show a personal configuration or live server connections.
 

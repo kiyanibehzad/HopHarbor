@@ -9,6 +9,7 @@
 *.dmg
 *.tar.gz
 *.pkg
+*.deb
 
 # Personal configuration, credentials and runtime state
 /data/

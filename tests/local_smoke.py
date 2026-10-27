@@ -115,7 +115,10 @@ def make_ssh_server(folder, prefix, port, username, cleanup):
         'PidFile ' + pm.quote(str(folder / (prefix + '.pid'))),
         'AuthorizedKeysFile ' + pm.quote(str(authorized)),
         'PasswordAuthentication no', 'KbdInteractiveAuthentication no',
-        'UsePAM no', 'PermitRootLogin no', 'AllowUsers ' + username,
+        # Ubuntu cloud users can have a locked password while public-key login
+        # remains valid through PAM; this does not change the account or password.
+        'UsePAM ' + ('yes' if sys.platform == 'linux' else 'no'),
+        'PermitRootLogin no', 'AllowUsers ' + username,
         'StrictModes yes', 'AllowTcpForwarding yes', 'GatewayPorts no',
         'X11Forwarding no', 'PrintMotd no', 'PrintLastLog no',
         'MaxStartups 50', 'LogLevel ERROR', ''

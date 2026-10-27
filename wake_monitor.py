@@ -1,6 +1,8 @@
-"""Detect confirmed macOS wake changes without subprocesses or a GUI dependency."""
+"""Detect kernel sleep/wake changes without subprocesses or a GUI dependency."""
 import ctypes
+import math
 import sys
+import time
 
 
 class _Timeval(ctypes.Structure):
@@ -25,13 +27,46 @@ class _NativeWakeReader:
         return value.tv_sec, value.tv_usec
 
 
+class _LinuxWakeReader:
+    """BOOTTIME includes suspend; MONOTONIC does not. Neither uses wall time."""
+    def __init__(self, boot_clock=None, monotonic_clock=None):
+        if boot_clock is None:
+            clock_id = time.CLOCK_BOOTTIME
+            boot_clock = lambda: time.clock_gettime(clock_id)
+        self.boot_clock = boot_clock
+        self.monotonic_clock = monotonic_clock or time.monotonic
+        self.offset = None
+        self.generation = 0
+
+    def __call__(self):
+        before = self.boot_clock()
+        mono = self.monotonic_clock()
+        after = self.boot_clock()
+        # Discard a sample if scheduling delay could resemble a suspend. The
+        # next fast sample establishes the actual cumulative suspend offset.
+        if (not all(math.isfinite(value) for value in (before, mono, after))
+                or after < before or after - before > .05):
+            return None
+        offset = (before + after) / 2 - mono
+        if self.offset is None:
+            self.offset = offset
+        elif offset - self.offset >= .25:
+            self.offset = offset
+            self.generation += 1
+        # A stable token absorbs clock-read jitter instead of treating a few
+        # nanoseconds of offset noise as a fresh wake on every monitor tick.
+        return self.generation, 0
+
+
 def _native_reader():
-    if sys.platform != 'darwin':
-        return None
     try:
-        return _NativeWakeReader()
+        if sys.platform == 'darwin':
+            return _NativeWakeReader()
+        if sys.platform.startswith('linux'):
+            return _LinuxWakeReader()
     except (AttributeError, OSError):
-        return None
+        pass
+    return None
 
 
 def _valid_token(value):

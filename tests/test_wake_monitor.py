@@ -49,8 +49,8 @@ class WakeMonitorTests(unittest.TestCase):
                 monitor = wake_monitor.WakeMonitor(reader=reader)
                 self.assertEqual([monitor.resumed() for _ in range(3)], [False, False, True])
 
-    def test_non_macos_import_and_default_monitor_are_inert(self):
-        with mock.patch.object(wake_monitor.sys, 'platform', 'linux'), \
+    def test_unsupported_platform_default_monitor_is_inert(self):
+        with mock.patch.object(wake_monitor.sys, 'platform', 'unsupported-test-only'), \
                 mock.patch.object(wake_monitor.ctypes, 'CDLL') as library:
             monitor = wake_monitor.WakeMonitor()
             self.assertFalse(monitor.resumed())

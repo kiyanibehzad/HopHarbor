@@ -27,8 +27,10 @@ import uuid
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
 
-VERSION = '1.1.4'
-BUILD = 7
+VERSION = '1.2.0'
+BUILD = 8
+MAC_VERSION = '1.1.4'
+MAC_BUILD = 7
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
 
@@ -154,6 +156,9 @@ class Child:
         self.ready = False
         try:
             env = dict(self.manager.child_env)
+            if sys.platform.startswith('linux') and self.server_id:
+                from agent_environment import child_environment
+                env = child_environment(env, self.manager.data)
             if self.server_id:
                 env['PM_SERVER_ID'] = self.server_id
             self.proc = subprocess.Popen(self.argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -393,6 +398,15 @@ class Manager:
         atomic_json(self.config_path, self.config)
 
     def keychain(self, action, payload):
+        if sys.platform.startswith('linux'):
+            helper = self.app / 'credentials.py'
+            if not helper.is_file():
+                raise ValueError('The GNOME Keyring component is unavailable. Install or update the app.')
+            q = subprocess.run([sys.executable, str(helper), action], input=json.dumps(payload),
+                               text=True, capture_output=True, timeout=15)
+            if q.returncode:
+                raise ValueError('Could not access GNOME Keyring. Sign in to the desktop and unlock the login keyring.')
+            return json.loads(q.stdout)
         helper = self.app / 'bin/keychain-helper'
         if not helper.exists():
             if action == 'has':
@@ -479,8 +493,11 @@ class Manager:
                  '  ConnectTimeout 12', '  ConnectionAttempts 1',
                  '  TCPKeepAlive yes', '  ExitOnForwardFailure yes',
                  '  RequestTTY no', '  Compression no', '  ForwardAgent no',
-                 '  GSSAPIAuthentication no', '  AddKeysToAgent yes', '  UseKeychain yes',
+                 '  GSSAPIAuthentication no', '  AddKeysToAgent yes',
                  '  LogLevel ERROR', '']
+        if sys.platform == 'darwin':
+            # Apple's option is rejected by stock OpenSSH on Linux.
+            lines.insert(-2, '  UseKeychain yes')
         for s in self.config['servers']:
             lines += ['Host pm_' + s['id'], '  HostName ' + s['host'],
                       '  User ' + s['username'], '  Port ' + str(s['port']),
@@ -659,7 +676,8 @@ class Manager:
             active = [r for r in self.runtime.values() if not r.get('stopping')]
             if not active:
                 return
-            self.log('info', 'Mac woke from sleep; refreshing active SSH connections.')
+            self.log('info', ('Mac woke from sleep' if sys.platform == 'darwin' else 'Computer resumed from sleep')
+                     + '; refreshing active SSH connections.')
             for tid, r in list(self.runtime.items()):
                 if r.get('stopping'):
                     continue
@@ -768,7 +786,11 @@ class Manager:
                 row.update(self._session_runtime_state(server['id'], tunnels))
                 servers.append(row)
             return {'servers': servers, 'tunnels': tunnels, 'logs': self.logs.snapshot(),
-                    'service': {'version': VERSION, 'build': BUILD, 'port': self.port, 'started_at': self.started_at,
+                    'service': {'version': MAC_VERSION if sys.platform == 'darwin' else VERSION,
+                                'build': MAC_BUILD if sys.platform == 'darwin' else BUILD,
+                                'port': self.port, 'started_at': self.started_at,
+                                'platform': 'linux' if sys.platform.startswith('linux') else sys.platform,
+                                'credential_store': 'GNOME Keyring' if sys.platform.startswith('linux') else 'Keychain',
                                 'fd_soft_limit': self.fd_limits['soft'], 'fd_hard_limit': self.fd_limits['hard'],
                                 'fd_limit_warning': self.fd_limits['warning'],
                                 'log_policy': {'retention': 'local-day', 'max_events': 200,
