@@ -1,20 +1,65 @@
 # HopHarbor
 
-Ubuntu **1.2.1** · build **9** | macOS **1.1.5** · build **8**
+A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
-Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
+[فارسی: راهنمای نصب و استفاده](README.fa.md) · [Downloads and releases](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
-A lightweight interface for the operating system’s OpenSSH client, with SOCKS/HTTP port forwarding and multi-session pools on macOS and Ubuntu 26.04 LTS.
+## Supported systems
 
-[فارسی: راهنمای شروع سریع](README.fa.md) · [Source repository](https://github.com/kiyanibehzad/HopHarbor)
+| Operating system | Supported hardware | Current app version | Installation |
+| --- | --- | --- | --- |
+| **macOS 13 or later** | **Apple Silicon / arm64** | 1.1.5 · build 8 | [Build from source](#macos) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.2.1 · build 9 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows** | — | Not available | The Windows edition has not been built yet. |
 
-HopHarbor separates background SSH connections from its native Dock and menu bar panel. It uses the OpenSSH client installed with macOS for SSH, launchd for the user background service, and macOS Keychain for credentials. GOST is an additional, separately downloaded dependency for local HTTP proxying and TCP connection distribution; it is not built into macOS. Closing the panel keeps connections running.
+Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
-## Ubuntu 26.04 LTS
+The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS and Ubuntu will use the same app version and build number.** Existing release tags and downloads retain their original versions.
 
-The Ubuntu edition uses the same local management panel and SSH forwarding engine. It replaces macOS launchd with a per-user systemd service, Keychain with GNOME Keyring / Secret Service, and the macOS window with GTK/WebKitGTK and an application indicator. It supports amd64 and arm64; Linux packages contain no personal Sessions, credentials, or keys.
+## Install
 
-See **[Ubuntu installation and usage](docs/ubuntu.md)** for `.deb` installation, dependencies, startup, keyring unlocking, and removal. The instructions below this section describe the macOS edition. A closed Ubuntu panel leaves the user service and active forwards running.
+### Ubuntu 26.04 LTS
+
+Download the package for your Ubuntu computer, then run the matching command from its download folder:
+
+**Intel / AMD (amd64):** [Download hopharbor_1.2.1_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_amd64.deb)
+
+```sh
+sudo apt install ./hopharbor_1.2.1_amd64.deb
+```
+
+**ARM64 (arm64):** [Download hopharbor_1.2.1_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_arm64.deb)
+
+```sh
+sudo apt install ./hopharbor_1.2.1_arm64.deb
+```
+
+Open **HopHarbor** from Applications. Packages include the verified GOST dependency; APT installs the required desktop libraries. Add your own Sessions and port forwards in the panel.
+
+[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/HopHarbor-Ubuntu-1.2.1-SHA256SUMS.txt)
+
+### macOS
+
+For **macOS 13+ on Apple Silicon**. The current installation method builds the app from source. It requires **Python 3.9+, Git and Xcode Command Line Tools / Swift**. To request Apple's command-line tools if they are missing, run `xcode-select --install` and finish that installation first.
+
+Review the source, then run:
+
+```sh
+git clone https://github.com/kiyanibehzad/HopHarbor.git
+cd HopHarbor
+python3 install.py
+open "$HOME/Applications/HopHarbor.app"
+```
+
+The installer builds the native app and Keychain helper, installs a per-user LaunchAgent, and starts the controller. It runs as your ordinary user without `sudo`. Local source builds are not Apple-notarized releases. A working SSH account with TCP forwarding allowed is required on every server in a connection chain.
+
+[macOS file locations and advanced installation options](#macos-installation-details) · [Create your first Session](#first-session)
+
+## How it runs
+
+HopHarbor keeps SSH connections in a background service separate from its desktop panel. macOS uses its system OpenSSH client, launchd, Keychain and a native Dock/menu bar app. Ubuntu uses OpenSSH, a per-user systemd service, GNOME Keyring / Secret Service, and GTK/WebKitGTK with an application indicator. Closing either panel keeps connections running.
+
+GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution; it is not built into either operating system. Public packages and source contain no personal Sessions, credentials or keys.
 
 ## Screenshots
 
@@ -57,30 +102,12 @@ Each Session may select another Session as its Firewall. Create the intermediary
 - Start, stop, restart, edit, and test individual port forwards.
 - Optional automatic startup and delayed recovery after an SSH process fails.
 - One to four SSH sessions per port forward, distributing new connections across ready sessions.
-- Passwords and private-key passphrases stored through macOS Keychain.
-- A fully local English management panel in a native macOS app with Dock and menu bar access.
+- Passwords and private-key passphrases stored through macOS Keychain or Ubuntu Secret Service.
+- A local English panel with macOS Dock/menu bar access or an Ubuntu desktop window and indicator.
 
 **A pool is not connection bonding.** One client connection uses one SSH session. A pool can distribute concurrent connections; it does not combine SSH sessions to accelerate one download. Start with one session and increase the count only when your workload benefits. Resource use depends on traffic, encryption, and pool size.
 
-## Requirements
-
-- An Apple Silicon Mac running macOS 13 or later.
-- Python 3.9+ and a Swift compiler available through Xcode Command Line Tools or Xcode.
-- The macOS OpenSSH client, `curl`, and the normal per-user `launchd` environment.
-- A working SSH account with TCP forwarding allowed on every server in a connection chain.
-
-Version 1's installer fetches the Darwin arm64 GOST release; Intel Macs are not supported by this installer. No `sudo`, system daemon, VPN driver, browser extension, Node.js, or Python package installation is needed. Source builds are local builds; they are not Apple-notarized releases.
-
-## Install
-
-Review the source, then run from your checkout:
-
-```sh
-git clone https://github.com/kiyanibehzad/HopHarbor.git
-cd HopHarbor
-python3 install.py
-open "$HOME/Applications/HopHarbor.app"
-```
+## macOS installation details
 
 The installer downloads the pinned official GOST 3.3.1 Darwin arm64 release and verifies its SHA-256 checksum before use. It builds the native app and Keychain helper, installs a per-user LaunchAgent, and starts the controller. The public default configuration has no personal Sessions or active forwards.
 
@@ -251,3 +278,5 @@ HopHarbor's original code is MIT-licensed; see [LICENSE](LICENSE). GOST's MIT no
 ## Concurrent connections
 
 The user service requests a soft open-file limit of up to 8,192, bounded by macOS and the inherited hard limit. This prevents the small default launchd limit from rejecting new proxy connections under concurrent traffic. Existing higher limits are preserved; hard limits are not lowered. Service status exposes the effective limits for diagnostics.
+
+Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
