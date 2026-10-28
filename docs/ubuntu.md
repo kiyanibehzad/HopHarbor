@@ -9,7 +9,7 @@ The Ubuntu installer and packages do not install a macOS app, run launchctl, mig
 Choose **amd64** for Intel/AMD PCs, or **arm64** for an ARM Ubuntu installation:
 
 ```sh
-sudo apt install ./hopharbor_1.2.0_amd64.deb
+sudo apt install ./hopharbor_1.2.1_amd64.deb
 ```
 
 Open **HopHarbor** from Applications. The launcher starts only `local.hopharbor.manager.service` in your own user session. The empty default configuration opens no proxy ports. Add your Sessions, verify the server host keys, then create forwarding entries on unused local ports and test them before moving any client applications.
@@ -55,6 +55,12 @@ python3 install_linux.py --gost-archive /path/to/gost_3.3.1_linux_amd64.tar.gz
 ```
 
 `--data-dir /absolute/private/path` selects a private data directory for a new per-user installation. There is one registered HopHarbor service per user. To change an existing installation's directory, remove its application/service with the original matching `--data-dir` first, then install with the new directory; settings are retained in the old directory. Opening the installed app starts its matching service, including after `--no-start`.
+
+## Resume recovery
+
+After a detected resume, active SSH transports are rebuilt together on their existing ports. Their proxy frontends stay running. During a bounded 90-second recovery window, failed SSH transports retry after one second and the controller checks readiness every half-second. Once a transport is ready, it resumes normal retry behavior; the normal monitor interval returns after recovery finishes or the window expires. Authentication and host-key errors remain blocked until corrected, and manually stopped forwards remain stopped.
+
+Failed loopback pool members are eligible again after one second. Recovery timing appears in the existing bounded same-day log. This improves reconnection after the network returns; it does not prevent suspend or provide continuous proxy service during sleep. See the [verification record](ubuntu-testing.md) for tested scenarios and limits.
 
 ## Desktop behavior and credentials
 
@@ -112,8 +118,8 @@ See [the Ubuntu test record](ubuntu-testing.md) for the tested environment, resu
 The package builder works on macOS or Linux. It copies a fixed public allowlist and does not inspect private runtime directories. It downloads and verifies the appropriate GOST release; no installer or service is executed:
 
 ```sh
-python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.2.0_amd64.deb
-python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.2.0_arm64.deb
+python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.2.1_amd64.deb
+python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.2.1_arm64.deb
 ```
 
 Use `--gost-archive` for an offline build with the same pinned verification. A source/package build alone is not proof of a successful Ubuntu desktop test. Run the unit suite and the separate local integration tests on Ubuntu 26.04, including credential storage, two-hop forwarding, pool recovery, sleep/resume and desktop indicator behavior.

@@ -1,6 +1,6 @@
 # HopHarbor
 
-Ubuntu **1.2.0** · build **8** | macOS **1.1.4** · build **7**
+Ubuntu **1.2.1** · build **9** | macOS **1.1.5** · build **8**
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
@@ -161,7 +161,9 @@ Status distinguishes stopped, starting, connected, degraded, and error states. C
 
 For a generic TCP forward, a listener test verifies only that the local port accepts a connection. It cannot establish the health of an arbitrary application beyond that port; the test result states this limitation.
 
-SSH keepalives detect an unresponsive SSH connection. Failed processes restart with a delay; authentication and host-key failures need correction instead of rapid endless retries. The background service checks macOS's kernel wake timestamp every three seconds. After a confirmed sleep/wake, it refreshes active SSH transports on their existing local ports and resets their retry delay, rather than waiting for old sockets to time out. Stopped forwards stay stopped, credential and host-key blocks remain, and the proxy frontend stays running. Network availability and authentication still affect recovery time; existing client connections may need to reconnect.
+SSH keepalives detect an unresponsive SSH connection. Failed processes normally restart with a 5–60 second delay; authentication and host-key failures wait for correction. The background service checks for sleep/resume every three seconds using the macOS kernel wake timestamp or Linux suspend-aware clocks. After a confirmed resume, it signals active SSH transports together and waits against shared termination deadlines, preserving their local ports and the running proxy frontends.
+
+For up to 90 seconds after resume, unsuccessful SSH transports retry after one second and the monitor checks every half-second. Each transport returns to the normal retry policy when it becomes ready; the monitor returns to its normal interval when recovery completes or the window expires. Stopped forwards remain stopped and credential/host-key blocks remain. A temporarily failed loopback pool member becomes eligible again after one second, so a recovered transport does not remain excluded for ten seconds. Recovery duration is recorded in the existing bounded log. Network availability and authentication still affect recovery time; existing client connections may need to reconnect. This does not prevent system sleep or keep a proxy usable while the computer is asleep.
 
 Errors belong to the process that produced them: a successfully started replacement clears its predecessor's status error, and late output from that predecessor cannot overwrite the new state. Client-request errors from the proxy are recorded in today's bounded **Logs** history, separate from persistent component/startup errors. Recovery does not erase that history.
 
@@ -185,7 +187,7 @@ The **Sessions** view shows forwarding status, the count of ready SSH transports
 
 The **Port Forwarding** view groups entries by Session and shows its Firewall route. Search and status filters apply inside those groups.
 
-Each Session has **Keepalive / NO-OP** settings. OpenSSH sends an encrypted server-alive request after the configured interval without receiving traffic. The defaults are 30 seconds and 3 missed replies; interval 0 disables these requests. See the [OpenSSH server-alive settings](https://man.openbsd.org/ssh_config#ServerAliveInterval). This serves the anti-idle and failed-connection detection purpose of SecureCRT's protocol NO-OP, using OpenSSH's own mechanism. Failed SSH processes reconnect with a delay of 5–60 seconds; authentication or host-key errors wait for correction. Enable automatic startup per forwarding entry if it should reconnect after the background service starts.
+Each Session has **Keepalive / NO-OP** settings. OpenSSH sends an encrypted server-alive request after the configured interval without receiving traffic. The defaults are 30 seconds and 3 missed replies; interval 0 disables these requests. See the [OpenSSH server-alive settings](https://man.openbsd.org/ssh_config#ServerAliveInterval). This serves the anti-idle and failed-connection detection purpose of SecureCRT's protocol NO-OP, using OpenSSH's own mechanism. Failed SSH processes normally reconnect with a delay of 5–60 seconds, with the bounded faster recovery window after resume described above; authentication or host-key errors wait for correction. Enable automatic startup per forwarding entry if it should reconnect after the background service starts.
 
 The installer reuses an unchanged, verified Keychain helper so ordinary interface/controller updates preserve its existing Keychain approval. A changed helper is rebuilt and may require access approval again.
 

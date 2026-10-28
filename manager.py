@@ -27,10 +27,10 @@ import uuid
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
 
-VERSION = '1.2.0'
-BUILD = 8
-MAC_VERSION = '1.1.4'
-MAC_BUILD = 7
+VERSION = '1.2.1'
+BUILD = 9
+MAC_VERSION = '1.1.5'
+MAC_BUILD = 8
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
 
@@ -143,6 +143,7 @@ class Child:
         self.blocked = False
         self.generation = 0
         self.server_id = server_id
+        self.recovery_until = 0
         self.is_gost = (server_id is None and bool(argv) and getattr(manager, 'app', None) is not None
                         and argv[0] == str(manager.app / 'bin/gost'))
 
@@ -229,7 +230,10 @@ class Child:
             self.proc = None
             self.ready = False
             self.failures = self.failures + 1 if t - self.last_start < 60 else 1
-            self.next_start = t + min(60, 5 * (2 ** min(self.failures - 1, 4)))
+            delay = min(60, 5 * (2 ** min(self.failures - 1, 4)))
+            if self.server_id and t < self.recovery_until:
+                delay = 1
+            self.next_start = t + delay
             if code and not self.error:
                 self.error = 'Process exited with code %s.' % code
                 self.error_time = t
@@ -257,11 +261,61 @@ class Child:
                 except ProcessLookupError:
                     pass
                 p.wait(timeout=2)
+        self._finish_stop(p)
+
+    def _finish_stop(self, p):
         # Preserve ownership if terminating/waiting raised an error.
         self.generation += 1
         self.proc = None
         if p:
             (self.manager.data / 'runtime' / ('child-%s.json' % p.pid)).unlink(missing_ok=True)
+
+    @staticmethod
+    def stop_many(children, timeout=.5, kill_timeout=2):
+        """Stop owned transports with shared deadlines, while the manager is locked."""
+        pending, errors = [], []
+        for child in children:
+            child.ready = False
+            proc = child.proc
+            try:
+                if proc and proc.poll() is None:
+                    try:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                pending.append((child, proc))
+            except Exception as error:
+                errors.append((child, error))
+        deadline = time.monotonic() + timeout
+        survivors = []
+        for child, proc in pending:
+            try:
+                if proc and proc.poll() is None:
+                    proc.wait(timeout=max(0, deadline - time.monotonic()))
+                child._finish_stop(proc)
+            except subprocess.TimeoutExpired:
+                survivors.append((child, proc))
+            except Exception as error:
+                errors.append((child, error))
+        killed = []
+        # Signal every survivor before waiting for any of them a second time.
+        for child, proc in survivors:
+            try:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                killed.append((child, proc))
+            except Exception as error:
+                errors.append((child, error))
+        deadline = time.monotonic() + kill_timeout
+        for child, proc in killed:
+            try:
+                proc.wait(timeout=max(0, deadline - time.monotonic()))
+                child._finish_stop(proc)
+            except Exception as error:
+                errors.append((child, error))
+        return errors
 
 
 class Manager:
@@ -300,6 +354,7 @@ class Manager:
         self.front_probes = {}
         self.halt = threading.Event()
         self.wake_monitor = WakeMonitor()
+        self.wake_recovery = None
         self.child_env = dict(os.environ)
         self.child_env['LC_ALL'] = 'C'
         self.child_env['SSH_ASKPASS'] = str(self.app / 'askpass.py')
@@ -526,7 +581,8 @@ class Manager:
         raise KeyError('Port forwarding entry not found.')
 
     def gost_config(self, tunnel, backend_ports):
-        selector = {'strategy': 'round', 'maxFails': 1, 'failTimeout': '10s'}
+        # A failed loopback SSH backend can return as soon as Wi-Fi is ready.
+        selector = {'strategy': 'round', 'maxFails': 1, 'failTimeout': '1s'}
         service = {'name': tunnel['id'], 'addr': '127.0.0.1:' + str(tunnel['local_port']),
                    'listener': {'type': 'tcp'}, 'handler': {'type': 'tcp'}}
         cfg = {'services': [service], 'log': {'level': 'error', 'output': 'stderr'}}
@@ -678,23 +734,43 @@ class Manager:
                 return
             self.log('info', ('Mac woke from sleep' if sys.platform == 'darwin' else 'Computer resumed from sleep')
                      + '; refreshing active SSH connections.')
-            for tid, r in list(self.runtime.items()):
-                if r.get('stopping'):
-                    continue
-                r.update(status='starting', healthy=0, last_test=None)
-                for c in r['ssh']:
-                    # Credential/host-key failures require correction, even after sleep.
-                    if c.blocked:
-                        continue
-                    try:
-                        c.stop(timeout=.5)
-                        c.failures = 0
-                        c.next_start = 0
-                    except Exception as error:
-                        self.log('error', 'Could not refresh SSH connection: ' + str(error), tid)
+            started = time.monotonic()
+            children = [c for r in active for c in r['ssh'] if not c.blocked]
+            self.wake_recovery = {'started': started, 'until': started + 90,
+                                  'pending': set(), 'restored': set()}
+            for tid, r in self.runtime.items():
+                if not r.get('stopping'):
+                    r.update(status='starting', healthy=0, last_test=None)
+                    if any(not c.blocked for c in r['ssh']):
+                        self.wake_recovery['pending'].add(tid)
+            errors = Child.stop_many(children)
+            failed = {id(c) for c, _error in errors}
+            for c in children:
+                if id(c) not in failed:
+                    c.failures = 0
+                    c.next_start = 0
+                    c.recovery_until = started + 90
+            for c, error in errors:
+                self.log('error', 'Could not refresh SSH connection: ' + str(error), c.tunnel_id)
+
+    def watch_interval(self):
+        recovery = getattr(self, 'wake_recovery', None)
+        if recovery and recovery['pending'] and time.monotonic() < recovery['until']:
+            return .5
+        return 3
+
+    def record_wake_progress(self, tid, r):
+        recovery = getattr(self, 'wake_recovery', None)
+        if not recovery or tid not in recovery['pending']:
+            return
+        if r['status'] == 'connected':
+            recovery['pending'].discard(tid)
+            recovery['restored'].add(tid)
+            self.log('info', 'SSH connections restored after wake in %.1f seconds.' %
+                     (time.monotonic() - recovery['started']), tid)
 
     def watch(self):
-        while not self.halt.wait(3):
+        while not self.halt.wait(self.watch_interval()):
             with self.lock:
                 if self.wake_monitor.resumed():
                     self.recover_after_wake()
@@ -718,8 +794,14 @@ class Manager:
                         self.log('error', 'Port forwarding monitor error: ' + str(e), tid)
                         r['status'] = 'error'
                         continue
-                    healthy = sum(bool(c.proc and c.proc.poll() is None and port_open(p))
-                                  for c, p in zip(r['ssh'], r['ports']))
+                    healthy = 0
+                    for c, p in zip(r['ssh'], r['ports']):
+                        ready = bool(c.proc and c.proc.poll() is None and port_open(p))
+                        c.ready = ready
+                        if ready:
+                            c.recovery_until = 0
+                            c.failures = 0
+                            healthy += 1
                     r['healthy'] = healthy
                     if healthy < len(r['ssh']):
                         r['last_test'] = None
@@ -735,6 +817,18 @@ class Manager:
                         r['status'] = ('connected' if healthy == len(r['ssh']) else 'degraded') if front else 'starting'
                     else:
                         r['status'] = 'error' if blocked else 'starting'
+                    self.record_wake_progress(tid, r)
+                recovery = getattr(self, 'wake_recovery', None)
+                if recovery:
+                    recovery['pending'].intersection_update(self.runtime)
+                    if not recovery['pending'] or time.monotonic() >= recovery['until']:
+                        remaining = len(recovery['pending'])
+                        if remaining or recovery['restored']:
+                            self.log('warning' if remaining else 'info',
+                                     ('Wake recovery window ended; %s port forwarding entries are still reconnecting.' % remaining)
+                                     if remaining else 'All active SSH connections restored after wake in %.1f seconds.' %
+                                     (time.monotonic() - recovery['started']))
+                        self.wake_recovery = None
 
     def test(self, tid):
         with self.lock:

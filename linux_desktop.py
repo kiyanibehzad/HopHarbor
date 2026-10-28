@@ -14,8 +14,8 @@ import sys
 from urllib.parse import quote, urlsplit
 
 
-VERSION = '1.2.0'
-BUILD = '8'
+VERSION = '1.2.1'
+BUILD = '9'
 REPOSITORY_URL = 'https://github.com/kiyanibehzad/HopHarbor'
 
 

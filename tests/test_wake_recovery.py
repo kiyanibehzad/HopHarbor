@@ -13,12 +13,24 @@ class WakeRecoveryTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.manager = bare_manager(self.temp.name)
+        # This suite exercises the shared Linux path; detailed batching and
+        # retry tests run separately with both supported platform identities.
+        platform = mock.patch.object(pm.sys, 'platform', 'linux')
+        platform.start()
+        self.addCleanup(platform.stop)
+        signals = mock.patch.object(pm.os, 'killpg')
+        signals.start()
+        self.addCleanup(signals.stop)
+        self.next_pid = 920000
 
     def child(self, blocked=False, fail_stop=False, alive=True):
+        self.next_pid += 1
         child = SimpleNamespace(
             blocked=blocked, failures=4, next_start=12345,
             error='Host key verification failed.' if blocked else 'Previous transport failure.',
-            ready=True, proc=SimpleNamespace(poll=mock.Mock(return_value=None)) if alive else None,
+            ready=True, proc=SimpleNamespace(pid=self.next_pid, poll=mock.Mock(return_value=None),
+                                            wait=mock.Mock(side_effect=OSError('Test-only process termination failure')
+                                                           if fail_stop else None)) if alive else None,
             tick=mock.Mock(), spawn=mock.Mock(), mark_ready=mock.Mock(),
         )
 
@@ -30,6 +42,8 @@ class WakeRecoveryTests(unittest.TestCase):
             child.ready = False
 
         child.stop = mock.Mock(side_effect=stop)
+        child._finish_stop = mock.Mock(side_effect=lambda _proc: stop())
+        child.tunnel_id = 'socks_uk'
         return child
 
     def runtime(self, children, stopping=False):
@@ -61,7 +75,7 @@ class WakeRecoveryTests(unittest.TestCase):
         self.assertEqual(current['healthy'], 0)
         self.assertIsNone(current['last_test'])
         for child in [live, already_dead]:
-            child.stop.assert_called_once_with(timeout=.5)
+            child._finish_stop.assert_called_once()
             child.spawn.assert_not_called()  # The existing watcher owns the next spawn.
             self.assertEqual((child.next_start, child.failures), (0, 0))
         self.assertIs(current['gost'].proc, frontend)
@@ -97,7 +111,7 @@ class WakeRecoveryTests(unittest.TestCase):
         blocked.stop.assert_not_called()
         blocked.spawn.assert_not_called()
         blocked.tick.assert_not_called()
-        working.stop.assert_called_once_with(timeout=.5)
+        working._finish_stop.assert_called_once()
         self.assertEqual((working.next_start, working.failures), (0, 0))
         current['gost'].stop.assert_not_called()
 
@@ -109,12 +123,12 @@ class WakeRecoveryTests(unittest.TestCase):
         other = self.runtime([other_child])
         self.manager.runtime = {'socks_uk': current, 'another_running_forward': other}
         self.manager.recover_after_wake()
-        failed.stop.assert_called_once_with(timeout=.5)
+        failed._finish_stop.assert_not_called()
         self.assertIs(failed.proc, failed_process)
         self.assertEqual((failed.next_start, failed.failures), (12345, 4))
         self.assertEqual(failed.error, 'Previous transport failure.')
         for child in [before, after, other_child]:
-            child.stop.assert_called_once_with(timeout=.5)
+            child._finish_stop.assert_called_once()
             self.assertEqual((child.next_start, child.failures), (0, 0))
         self.assertIs(self.manager.runtime['socks_uk'], current)
         self.assertEqual((current['status'], current['healthy'], current['last_test']), ('starting', 0, None))
@@ -141,7 +155,7 @@ class WakeRecoveryTests(unittest.TestCase):
                 mock.patch.object(self.manager, 'start') as start:
             self.manager.watch()
         recover.assert_called_once_with()
-        child.stop.assert_called_once_with(timeout=.5)
+        child._finish_stop.assert_called_once()
         self.assertEqual(child.tick.call_count, 3)
         start.assert_not_called()
         self.assertIs(current['gost'].proc, frontend)
