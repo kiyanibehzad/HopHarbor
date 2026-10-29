@@ -1,20 +1,30 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو**، با پنل گرافیکی و سرویس پس‌زمینه.
+مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
 
 [English guide](README.md) · [دانلود و انتشارها](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
 ## سیستم‌های پشتیبانی‌شده
 
-| سیستم‌عامل | سخت‌افزار | نسخهٔ فعلی برنامه | روش نصب |
+این شاخهٔ آزمایشی در اطلاعات همهٔ سیستم‌عامل‌ها از **نسخهٔ 1.3.0 · بیلد 10** استفاده می‌کند. [انتشار آزمایشی ویندوز](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) فایل‌های x64 و ARM64 را دارد. تست‌های بومی Windows 10 x64 پاس شده‌اند؛ اجرای Windows 11 و ARM64 هنوز تأیید نشده است. لینک‌های پایدار مک و اوبونتو در ادامه، نسخه‌های قبلی را حفظ می‌کنند.
+
+| سیستم‌عامل | سخت‌افزار | آخرین نسخهٔ منتشرشده | روش نصب |
 | --- | --- | --- | --- |
 | **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.1.5 · بیلد 8 | [ساخت از سورس](#نصب-روی-مک) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.2.1 · بیلد 9 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **ویندوز** | — | موجود نیست | نسخهٔ ویندوز هنوز ساخته نشده است. |
+
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
-شماره‌های جدول مربوط به انتشارهای فعلی‌اند. **از به‌روزرسانی بعدی، نسخه و شمارهٔ بیلد مک و اوبونتو یکسان خواهند بود.** شمارهٔ انتشارها، تگ‌ها و فایل‌های قبلی حفظ می‌شود.
+شماره‌های جدول مربوط به انتشارهای فعلی‌اند. **از به‌روزرسانی بعدی، نسخه و شمارهٔ بیلد مک، اوبونتو و ویندوز یکسان خواهند بود.** شمارهٔ انتشارها، تگ‌ها و فایل‌های قبلی حفظ می‌شود.
+
+## نسخهٔ آزمایشی ویندوز — 1.3.0 · بیلد 10
+
+- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده — هنوز تست اجرایی نشده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
+- [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [راهنمای نصب و استفاده](packaging/windows/README.md).
+
+نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد. تست اتصال‌ها، پنل و نصب و حذف روی Windows 10 Pro 22H2 x64 پاس شده‌اند؛ Windows 11، اجرای بومی ARM64 و خواب یا تغییر واقعی شبکه هنوز تأیید نشده‌اند. [جزئیات آزمون‌ها](docs/windows-testing.md) مشخص است.
 
 ## نصب
 
@@ -45,7 +55,7 @@ sudo apt install ./hopharbor_1.2.1_arm64.deb
 پس از بررسی سورس اجرا کنید:
 
 ```sh
-git clone https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.2.1 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -57,7 +67,7 @@ open "$HOME/Applications/HopHarbor.app"
 
 ## اجرای پس‌زمینه و اجزای برنامه
 
-موتور SSH همان OpenSSH سیستم‌عامل است. مک از launchd و Keychain و اوبونتو از systemd و GNOME Keyring استفاده می‌کند. GOST جزء اضافه‌ای برای پراکسی HTTP و توزیع اتصال‌هاست و جزو ابزارهای داخلی سیستم‌عامل نیست. بستن پنجره، سرویس اتصال‌ها را قطع نمی‌کند. سورس و بسته‌های عمومی شامل تنظیمات، رمزها یا کلیدهای شخصی نیستند.
+موتور SSH همان OpenSSH سیستم‌عامل است. مک از launchd و Keychain و اوبونتو از systemd و GNOME Keyring استفاده می‌کند. GOST جزء اضافه‌ای برای پراکسی HTTP و توزیع اتصال‌هاست و جزو ابزارهای داخلی سیستم‌عامل نیست. نسخهٔ آزمایشی ویندوز از OpenSSH سیستم، Windows Credential Manager، پنل WebView2 و پراکسی داخلی پروژه استفاده می‌کند و فایل اجرایی GOST ندارد. بستن پنجره، سرویس اتصال‌ها را قطع نمی‌کند. سورس و بسته‌های عمومی شامل تنظیمات، رمزها یا کلیدهای شخصی نیستند.
 
 ## اصطلاح‌های پنل
 

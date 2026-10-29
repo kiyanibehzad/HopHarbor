@@ -4,6 +4,8 @@ import argparse
 import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 
 def main():
     p = argparse.ArgumentParser()
@@ -17,6 +19,16 @@ def main():
         raise SystemExit(1)
     if any(c.isspace() or ord(c) < 33 for c in a.host) or a.host.startswith('-'):
         raise SystemExit(1)
+    if sys.platform == 'win32':
+        # Windows OpenSSH normally calls the native hop helper directly. This
+        # entry point also remains usable from a reviewed source checkout.
+        app = Path(a.app_dir).resolve()
+        helper = app / 'bin/HopHarborHelper.exe'
+        env = dict(os.environ, PM_SERVER_ID=a.server, PM_DATA_DIR=str(Path(a.data_dir).resolve()),
+                   HOPHARBOR_APP=str(app))
+        process = subprocess.run([str(helper), 'hop', '--server', a.server, '--host', a.host,
+                                  '--port', str(a.port)], env=env)
+        raise SystemExit(process.returncode)
     os.environ.update(PM_SERVER_ID=a.server, PM_DATA_DIR=str(Path(a.data_dir).resolve()),
                       SSH_ASKPASS=str(Path(a.app_dir).resolve() / 'askpass.py'),
                       SSH_ASKPASS_REQUIRE='force', DISPLAY='HopHarbor', LC_ALL='C')

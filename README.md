@@ -1,20 +1,35 @@
 # HopHarbor
 
-A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with SOCKS/HTTP forwarding, SSH jump chains and connection pools.
+A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
 [فارسی: راهنمای نصب و استفاده](README.fa.md) · [Downloads and releases](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
 ## Supported systems
 
-| Operating system | Supported hardware | Current app version | Installation |
+This preview branch uses **1.3.0 · build 10** across all platform metadata. The [Windows prerelease](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) provides x64 and ARM64 downloads. Native Windows 10 x64 compatibility tests pass; Windows 11 and native ARM64 execution remain unverified. Stable macOS and Ubuntu release links below keep their existing versions.
+
+| Operating system | Supported hardware | Latest published app | Installation |
 | --- | --- | --- | --- |
 | **macOS 13 or later** | **Apple Silicon / arm64** | 1.1.5 · build 8 | [Build from source](#macos) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.2.1 · build 9 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows** | — | Not available | The Windows edition has not been built yet. |
+
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
-The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS and Ubuntu will use the same app version and build number.** Existing release tags and downloads retain their original versions.
+The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS, Ubuntu and Windows will use the same app version and build number.** Existing release tags and downloads retain their original versions.
+
+## Windows preview — 1.3.0 · build 10
+
+- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup — native execution not yet tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
+- [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [Installation and usage](packaging/windows/README.md).
+
+Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client
+and Microsoft Edge WebView2 Runtime must already be available. Settings and
+credentials start empty; enter your own Sessions in the panel. The preview is
+unsigned. Native Windows 10 Pro 22H2 x64 forwarding, panel, installation and removal
+checks pass; native Windows 11/ARM64 and real sleep/network events remain
+unverified. See [the validation record](docs/windows-testing.md).
 
 ## Install
 
@@ -45,7 +60,7 @@ For **macOS 13+ on Apple Silicon**. The current installation method builds the a
 Review the source, then run:
 
 ```sh
-git clone https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.2.1 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -59,7 +74,7 @@ The installer builds the native app and Keychain helper, installs a per-user Lau
 
 HopHarbor keeps SSH connections in a background service separate from its desktop panel. macOS uses its system OpenSSH client, launchd, Keychain and a native Dock/menu bar app. Ubuntu uses OpenSSH, a per-user systemd service, GNOME Keyring / Secret Service, and GTK/WebKitGTK with an application indicator. Closing either panel keeps connections running.
 
-GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution; it is not built into either operating system. Public packages and source contain no personal Sessions, credentials or keys.
+GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution on macOS and Ubuntu. The Windows preview uses system OpenSSH, a per-user controller, Windows Credential Manager, a WebView2/tray panel and the project's own Python proxy frontend; it ships no GOST executable. Public packages and source contain no personal Sessions, credentials or keys.
 
 ## Screenshots
 

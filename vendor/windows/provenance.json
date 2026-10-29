@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "purpose": "Redistributed Windows .NET runtime, apphost, WindowsDesktop and WebView2 SDK notice provenance. Notices are exact copies from the upstream NuGet archives. Runtime and apphost notices match between ARM64 and x64.",
+  "build_sdk": {
+    "name": ".NET SDK",
+    "version": "10.0.403",
+    "redistributed": false,
+    "source": "https://dotnet.microsoft.com/download/dotnet/10.0"
+  },
+  "packages": [
+    {
+      "name": "Microsoft.NETCore.App.Runtime.win-arm64",
+      "version": "10.0.14",
+      "architecture": "arm64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-arm64/10.0.14/microsoft.netcore.app.runtime.win-arm64.10.0.14.nupkg",
+      "sha256": "b939042d9e9a8c1fe7b7e8632a199e6809b630faad42a35e57e92c3d3c9eed51",
+      "sha512": "VX6JXS+AXtCL8brqXN5qvXmOzrlHOraG5T8dpdn3O1IL2knDcR1XwDNWZc2lLWuyg3u1Muu4zme2C5VnLOBoMQ==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE.TXT",
+          "file": "DOTNET-LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "upstream_file": "THIRD-PARTY-NOTICES.TXT",
+          "file": "DOTNET-THIRD-PARTY-NOTICES.txt",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.NETCore.App.Runtime.win-x64",
+      "version": "10.0.14",
+      "architecture": "x64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-x64/10.0.14/microsoft.netcore.app.runtime.win-x64.10.0.14.nupkg",
+      "sha256": "a3ea61b4a2da6d28e562dd1cdacf80eb4dd6b9727b0a2b47f9d6aba90dbbcb1f",
+      "sha512": "mLWGagTP5n7nMfJQI2XpXRYgvPcnyYvAc8ZiDfum8ShM0UcrPDyfW4Lqo45UtlCHCucERUHQuMTI6ybVweCN9A==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE.TXT",
+          "file": "DOTNET-LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "upstream_file": "THIRD-PARTY-NOTICES.TXT",
+          "file": "DOTNET-THIRD-PARTY-NOTICES.txt",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.NETCore.App.Host.win-arm64",
+      "version": "10.0.14",
+      "architecture": "arm64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.host.win-arm64/10.0.14/microsoft.netcore.app.host.win-arm64.10.0.14.nupkg",
+      "sha256": "57550b78a749ed9657e181ab03bd86f898de6ad0c6059d8308603f307cd31207",
+      "sha512": "sFXQ5snIEdwGEn8umr0TxoLXIa2ubuQZFSzRogkLW/XQmVOLb2hwdmDPl7wBQYc0rb4Qo2eUEVsjD5elJFQx9g==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE.TXT",
+          "file": "DOTNET-LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "upstream_file": "THIRD-PARTY-NOTICES.TXT",
+          "file": "DOTNET-THIRD-PARTY-NOTICES.txt",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.NETCore.App.Host.win-x64",
+      "version": "10.0.14",
+      "architecture": "x64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.host.win-x64/10.0.14/microsoft.netcore.app.host.win-x64.10.0.14.nupkg",
+      "sha256": "2a4547b0e6cf0dd15e723531daa5450d99d4e151105aec0d31f2b0c7cfb286db",
+      "sha512": "Kn602fS/n6hsgpCW8HzykOu31D/oNrxhETNlgoou5yj7Zvvw9KWX3GnG7hevtm9R3VKdP1kPEfQ0Y3eo83YafQ==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE.TXT",
+          "file": "DOTNET-LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "upstream_file": "THIRD-PARTY-NOTICES.TXT",
+          "file": "DOTNET-THIRD-PARTY-NOTICES.txt",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.WindowsDesktop.App.Runtime.win-arm64",
+      "version": "10.0.14",
+      "architecture": "arm64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.windowsdesktop.app.runtime.win-arm64/10.0.14/microsoft.windowsdesktop.app.runtime.win-arm64.10.0.14.nupkg",
+      "sha256": "c9966a7ea172b36cdeea68e6cccf23f42fc6c0aba33ac6ecf9c80980e45b58f7",
+      "sha512": "lSaoV5YDlcF/C36uu0fQA0RCUt/N0GMEZuUNXJw6ReuSeuG5lUFoKb6QtD1/Voro/EWalx3OBZacIaX7k0bs+Q==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE",
+          "file": "WINDOWSDESKTOP-LICENSE.txt",
+          "sha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+      "version": "10.0.14",
+      "architecture": "x64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.windowsdesktop.app.runtime.win-x64/10.0.14/microsoft.windowsdesktop.app.runtime.win-x64.10.0.14.nupkg",
+      "sha256": "a6dba3ca8b8b5b7945399545d881e0ac294746a7571f2209981934d49ecfe8cc",
+      "sha512": "Hxj4llZzFIss9eBt/EKnxessXLi3/wj6Cwrqp2ZL1j74Pmg8VM+IZd9B7bWGt8flKre7z6cJwoRY5YpwJqX44Q==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE",
+          "file": "WINDOWSDESKTOP-LICENSE.txt",
+          "sha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab"
+        }
+      ],
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "0427b9abbead3fa64c6655eb4290c537397131fa"
+      }
+    },
+    {
+      "name": "Microsoft.Web.WebView2",
+      "version": "1.0.4314.35",
+      "architecture": "arm64,x64",
+      "download": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4314.35/microsoft.web.webview2.1.0.4314.35.nupkg",
+      "sha256": "90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4",
+      "sha512": "cOaiVqP3BmQHMnxGpZzANM22tUXgycrisyJHjIGNzIaMsm8iXj7Kx+ceYg+RbYwJtzT009qfcFTocvVLY+ekMw==",
+      "notices": [
+        {
+          "upstream_file": "LICENSE.txt",
+          "file": "WEBVIEW2-LICENSE.txt",
+          "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55"
+        },
+        {
+          "upstream_file": "NOTICE.txt",
+          "file": "WEBVIEW2-NOTICE.txt",
+          "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90"
+        }
+      ],
+      "license": {
+        "type": "file",
+        "value": "LICENSE.txt"
+      }
+    }
+  ],
+  "webview2_browser_runtime_bundled": false
+}

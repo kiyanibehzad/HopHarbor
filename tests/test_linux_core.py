@@ -164,8 +164,8 @@ class LinuxManagerTests(unittest.TestCase):
                 service = self.manager.state()['service']
                 self.assertEqual(service['platform'], platform)
                 self.assertEqual(service['credential_store'], name)
-                self.assertEqual(service['version'], '1.1.5' if platform == 'darwin' else '1.2.1')
-                self.assertEqual(service['build'], 8 if platform == 'darwin' else 9)
+                self.assertEqual(service['version'], pm.VERSION)
+                self.assertEqual(service['build'], pm.BUILD)
 
 
 class LinuxWakeTests(unittest.TestCase):

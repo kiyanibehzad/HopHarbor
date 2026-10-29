@@ -1,0 +1,2 @@
+# Preserve exact upstream notice bytes, including original line endings/spacing.
+*.txt -text whitespace=-blank-at-eol,-blank-at-eof

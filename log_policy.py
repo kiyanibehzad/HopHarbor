@@ -5,6 +5,7 @@ import io
 import os
 from pathlib import Path
 import stat
+import sys
 import threading
 import time
 
@@ -104,23 +105,32 @@ class DailyBoundedStream(io.TextIOBase):
         self.name = str(Path(logs_dir) / filename)
         self._day = _local_now(self._clock).date()
         directory = os.path.abspath(os.path.expanduser(os.fspath(logs_dir)))
+        if sys.platform == 'win32':
+            import windows_platform
+            windows_platform.ensure_private_directory(directory)
+        else:
+            try:
+                os.mkdir(directory, 0o700)
+            except FileExistsError:
+                pass
         try:
-            os.mkdir(directory, 0o700)
-        except FileExistsError:
-            pass
-        try:
-            self._dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            info = os.fstat(self._dir_fd)
-            if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
-                raise ValueError('The log directory must be private and owned by the current user.')
-            self._fd = os.open(filename, os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW,
-                               0o600, dir_fd=self._dir_fd)
-            info = os.fstat(self._fd)
-            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
-                raise ValueError('The log file must be owned by the current user and have no additional hard links.')
-            # Older launchd-created files may be 0644 inside the private directory.
-            # Tighten this validated file in place so upgrades keep working safely.
-            os.fchmod(self._fd, 0o600)
+            if sys.platform == 'win32':
+                self._fd = windows_platform.open_private_file(
+                    os.path.join(directory, filename), os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
+                info = os.fstat(self._fd)
+            else:
+                self._dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                info = os.fstat(self._dir_fd)
+                if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+                    raise ValueError('The log directory must be private and owned by the current user.')
+                self._fd = os.open(filename, os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW,
+                                   0o600, dir_fd=self._dir_fd)
+                info = os.fstat(self._fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+                    raise ValueError('The log file must be owned by the current user and have no additional hard links.')
+                # Older launchd-created files may be 0644 inside the private directory.
+                # Tighten this validated file in place so upgrades keep working safely.
+                os.fchmod(self._fd, 0o600)
             existing_day = datetime.datetime.fromtimestamp(info.st_mtime).astimezone().date()
             if existing_day != self._day or info.st_size > STREAM_LIMIT:
                 os.ftruncate(self._fd, 0)

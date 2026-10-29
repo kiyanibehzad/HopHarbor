@@ -102,7 +102,7 @@ def main():
                                 'fragment:location.hash,locked:document.getElementById("lockedScreen").hidden})')
             assert overview['title'] == 'Overview', overview
             assert overview['platform'] == 'linux', overview
-            assert 'v1.2.1' in overview['version'] and 'build 9' in overview['version'], overview
+            assert 'v1.3.0' in overview['version'] and 'build 10' in overview['version'], overview
             assert overview['fragment'] == '' and overview['locked'], 'Bootstrap token was not cleared.'
             checks.append('authenticated Overview, version, Linux platform and cleared token fragment')
 

@@ -69,7 +69,7 @@ class LinuxDesktopTests(unittest.TestCase):
 
     def test_native_bootstrap_contains_only_public_metadata(self):
         script = panel.bootstrap_script(True)
-        self.assertIn('"version":"1.2.1"', script)
+        self.assertIn('"version":"1.3.0"', script)
         self.assertIn('window.HopHarborPlatform="linux"', script)
         self.assertIn('window.HopHarborSystemDark=true', script)
         self.assertNotIn('token', script)
