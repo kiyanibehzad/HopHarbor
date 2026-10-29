@@ -10,11 +10,23 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with SOCKS/H
 | --- | --- | --- | --- |
 | **macOS 13 or later** | **Apple Silicon / arm64** | 1.1.5 · build 8 | [Build from source](#macos) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.2.1 · build 9 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows** | — | Not available | The Windows edition has not been built yet. |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
-The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS and Ubuntu will use the same app version and build number.** Existing release tags and downloads retain their original versions.
+The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS, Ubuntu and Windows will use the same app version and build number.** Existing release tags and downloads retain their original versions.
+
+## Windows preview — 1.3.0 · build 10
+
+- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup — native execution not yet tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
+- [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [Installation and usage](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/packaging/windows/README.md).
+
+Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client
+and Microsoft Edge WebView2 Runtime must already be available. Settings and
+credentials start empty; enter your own Sessions in the panel. The preview is
+unsigned. Native Windows 10 Pro 22H2 x64 forwarding, panel, installation and removal
+checks pass; native Windows 11/ARM64 and real sleep/network events remain
+unverified. See [the validation record](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/docs/windows-testing.md).
 
 ## Install
 

@@ -10,11 +10,18 @@
 | --- | --- | --- | --- |
 | **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.1.5 · بیلد 8 | [ساخت از سورس](#نصب-روی-مک) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.2.1 · بیلد 9 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **ویندوز** | — | موجود نیست | نسخهٔ ویندوز هنوز ساخته نشده است. |
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
-شماره‌های جدول مربوط به انتشارهای فعلی‌اند. **از به‌روزرسانی بعدی، نسخه و شمارهٔ بیلد مک و اوبونتو یکسان خواهند بود.** شمارهٔ انتشارها، تگ‌ها و فایل‌های قبلی حفظ می‌شود.
+شماره‌های جدول مربوط به انتشارهای فعلی‌اند. **از به‌روزرسانی بعدی، نسخه و شمارهٔ بیلد مک، اوبونتو و ویندوز یکسان خواهند بود.** شمارهٔ انتشارها، تگ‌ها و فایل‌های قبلی حفظ می‌شود.
+
+## نسخهٔ آزمایشی ویندوز — 1.3.0 · بیلد 10
+
+- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده — هنوز تست اجرایی نشده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
+- [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [راهنمای نصب و استفاده](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/packaging/windows/README.md).
+
+نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد. تست اتصال‌ها، پنل و نصب و حذف روی Windows 10 Pro 22H2 x64 پاس شده‌اند؛ Windows 11، اجرای بومی ARM64 و خواب یا تغییر واقعی شبکه هنوز تأیید نشده‌اند. [جزئیات آزمون‌ها](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/docs/windows-testing.md) مشخص است.
 
 ## نصب
 
