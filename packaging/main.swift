@@ -9,13 +9,17 @@ private struct PanelControl: Decodable {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private var statusItem: NSStatusItem!
     private var window: NSWindow!
     private var rootView: NSView!
     private var webView: WKWebView?
     private var activePort: Int?
     private var allowTermination = false
+    private var recoveryPolicy = PanelRecoveryPolicy()
+    private var recoveryWork: DispatchWorkItem?
+    private var pageGeneration = 0
+    private var needsReauthentication = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -139,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     @objc private func showPanel(_ sender: Any?) {
         NSApp.setActivationPolicy(.regular)
-        if webView == nil { loadPanel() }
+        if webView == nil || needsReauthentication { loadPanel() }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -192,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     private func loadPanel() {
+        discardPage()
         removeChildren()
         let control: PanelControl
         do {
@@ -239,7 +244,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 injectionTime: .atDocumentStart, forMainFrameOnly: true
             ))
         }
+#if HOPHARBOR_PANEL_TESTING
+        configuration.websiteDataStore = .nonPersistent()
+#else
         configuration.websiteDataStore = .default()
+#endif
+        configuration.userContentController.add(self, name: "hopharborPanel")
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let browser = WKWebView(frame: .zero, configuration: configuration)
         browser.translatesAutoresizingMaskIntoConstraints = false
@@ -259,12 +269,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     private func discardPage() {
         // Destroying the page stops its status polling while the panel is closed.
+        pageGeneration += 1
+        recoveryWork?.cancel()
+        recoveryWork = nil
+        needsReauthentication = false
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "hopharborPanel")
         webView?.stopLoading()
         webView?.navigationDelegate = nil
         webView?.loadHTMLString("<html></html>", baseURL: nil)
         webView?.removeFromSuperview()
         webView = nil
         activePort = nil
+    }
+
+    private func recoverPanel(_ browser: WKWebView, manual: Bool) {
+        guard browser === webView else { return }
+        needsReauthentication = true
+        guard window.isVisible, !window.isMiniaturized, recoveryWork == nil,
+              let delay = recoveryPolicy.delay(manual: manual, now: ProcessInfo.processInfo.systemUptime) else {
+            return
+        }
+        let generation = pageGeneration
+        let work = DispatchWorkItem { [weak self, weak browser] in
+            guard let self = self, let browser = browser,
+                  generation == self.pageGeneration, browser === self.webView else { return }
+            self.recoveryWork = nil
+            guard self.window.isVisible, !self.window.isMiniaturized else { return }
+            // Reread the private access file and bootstrap a fresh page. Never
+            // replay the request which failed, especially a modifying request.
+            self.loadPanel()
+        }
+        recoveryWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        let origin = message.frameInfo.securityOrigin
+        guard message.name == "hopharborPanel",
+              PanelRecoveryPolicy.trustsMessage(
+                currentView: message.webView === webView, mainFrame: message.frameInfo.isMainFrame,
+                scheme: origin.protocol, host: origin.host, port: origin.port,
+                frameURL: message.frameInfo.request.url, activePort: activePort),
+              let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
+        if action == "ready", body.count == 1 {
+            recoveryWork?.cancel()
+            recoveryWork = nil
+            recoveryPolicy.authenticated()
+            needsReauthentication = false
+        } else if action == "reauthenticate", body.count == 2,
+                  let reason = body["reason"] as? String,
+                  ["authentication", "retry"].contains(reason), let browser = webView {
+            recoverPanel(browser, manual: reason == "retry")
+        }
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        recoverPanel(webView, manual: false)
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        if needsReauthentication { loadPanel() }
     }
 
     private func removeChildren() {
@@ -325,16 +390,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
         if (error as NSError).code == NSURLErrorCancelled { return }
+        discardPage()
         showError("Unable to connect to the panel.", detail: "Check that the background service is running and try again.")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
         if (error as NSError).code == NSURLErrorCancelled { return }
+        discardPage()
         showError("The panel could not be loaded.", detail: "Reload the panel and try again.")
     }
 }
 
+#if HOPHARBOR_PANEL_TESTING
+// Compiled only by the opt-in, isolated AppKit test bundle. The normal launcher
+// has no test controls, environment overrides or externally callable hooks.
+extension AppDelegate {
+    var testingBrowser: WKWebView? { webView }
+    var testingGeneration: Int { pageGeneration }
+    var testingRecoveryScheduled: Bool { recoveryWork != nil }
+    var testingNeedsReauthentication: Bool { needsReauthentication }
+    func testingReload() { reloadPanel(nil) }
+    func testingHide() { keepInMenuBar(nil) }
+    func testingShow() { showPanel(nil) }
+    func testingNameWindow() { window.title = "HopHarbor — isolated panel test" }
+    func testingPrimeRecoveryCooldown() {
+        _ = recoveryPolicy.delay(manual: true, now: ProcessInfo.processInfo.systemUptime)
+    }
+    func testingQuit() {
+        allowTermination = true
+        discardPage()
+        NSApp.terminate(nil)
+    }
+}
+#endif
+
+#if !HOPHARBOR_PANEL_TESTING
 @main
 enum ProxyManagerMain {
     @MainActor
@@ -345,3 +438,4 @@ enum ProxyManagerMain {
         withExtendedLifetime(appDelegate) { application.run() }
     }
 }
+#endif

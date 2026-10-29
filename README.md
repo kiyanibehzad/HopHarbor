@@ -8,12 +8,14 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with SOCKS/H
 
 | Operating system | Supported hardware | Current app version | Installation |
 | --- | --- | --- | --- |
-| **macOS 13 or later** | **Apple Silicon / arm64** | 1.1.5 · build 8 | [Build from source](#macos) |
+| **macOS 13 or later** | **Apple Silicon / arm64** | 1.3.1 · build 11 (source) | [Build from source](#macos) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.2.1 · build 9 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
-The existing platform releases keep the version numbers shown above. **Starting with the next app update, macOS, Ubuntu and Windows will use the same app version and build number.** Existing release tags and downloads retain their original versions.
+**New source builds use one shared app version and build number: 1.3.1 · build 11.** Existing Ubuntu packages and the Windows preview below retain their published versions; their next rebuilt update joins the common version. Existing release tags and downloads are preserved.
+
+The macOS panel update restores its local sign-in when panel access is lost and adds recovery for an interrupted page. Reloading the panel leaves background SSH connections running. See the [panel recovery and validation record](docs/macos-panel-recovery.md).
 
 ## Windows preview — 1.3.0 · build 10
 

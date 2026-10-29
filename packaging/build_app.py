@@ -38,7 +38,8 @@ def main():
         subprocess.run([
             "/usr/bin/xcrun", "swiftc", "-swift-version", "5", "-parse-as-library", "-O",
             "-target", "arm64-apple-macosx13.0", "-framework", "AppKit",
-            "-framework", "WebKit", str(source / "main.swift"), "-o", str(binary),
+            "-framework", "WebKit", str(source / "PanelRecovery.swift"),
+            str(source / "main.swift"), "-o", str(binary),
         ], check=True)
         subprocess.run([
             "/usr/bin/codesign", "--force", "--sign", "-", "--options", "runtime",
