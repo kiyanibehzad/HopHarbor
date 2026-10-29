@@ -58,11 +58,10 @@ assertions and 14 shared JavaScript transport/behavior cases.
   panel assertions, 19 end-to-end forwarding checks and five actual x64
   installer/uninstaller checks passed. The private test assembly is separate from
   shipped binaries; the final production payload displayed build 12 and recovered
-  a missing cookie without restarting its controller. Native Windows 11, ARM64
-  execution/installation, SSH agent, physical sleep, real OS network/logon/RDP
-  transitions, signing and reputation remain unverified.
+  a missing cookie without restarting its controller. These Windows 10 x64 results
+  remain compatibility evidence; see the later ARM64 validation below.
 
-**Windows protocol deadline limitation:** the unchanged grouped protocol suite
+**Historical Windows 10 x64 protocol deadline limitation:** the unchanged grouped protocol suite
 has **19 passes and one failed 2 MiB stream case**, reaching its original
 four-second deadline in three candidate runs. The same suite and failure were
 reproduced against the previous published 1.3.0 preview. Forwarding code and Python
@@ -72,6 +71,28 @@ isolated and 3.66 seconds in a full-suite diagnostic using an explicit 30-second
 read deadline. These diagnostics do **not** turn the original failures into passes.
 This is accepted as a documented pre-existing preview timing/environment limitation;
 no production timeout, forwarding implementation or authoritative test was changed.
+
+### Post-publication Windows 11 ARM64 validation
+
+On 29 October 2026 the exact already-published ARM64 ZIP and Setup passed testing
+on Windows 11 Pro 24H2 ARM64 (build 26100.7840): 20 original protocol cases with
+unchanged deadlines, 10 security, 13 recovery, 12 production lifecycle (including
+10 packaged panel assertions), 19 forwarding and five actual install/uninstall
+checks. Desktop/helper/controller, Python, OpenSSH and WebView2 were native ARM64;
+Inno Setup/uninstaller and the separate synthetic SSH server used x64 emulation.
+
+An additional synthetic transfer received the exact 2,097,165 bytes and EOF in
+about 0.47 seconds with the unchanged four-second read bound. This new ARM64
+result is not an Internet-speed benchmark and does not erase or relabel the prior
+Windows 10 x64 failures above. Product files were not rebuilt. See [the exact
+artifact identities, environment and validation scope](windows-arm64-validation-1.3.2.md).
+
+Windows remains **Preview**. Native Windows 11 x64, physical sleep, real OS
+network/logon/logout/RDP transitions, SSH-agent integration, signing/reputation
+and clean unprovisioned-machine prerequisites remain unverified. The release tag,
+application version/build, status and asset bytes are unchanged; this is a later
+documentation correction. The original source ZIP/tag retain their publication-time
+text; current documentation on the main branch includes this later evidence.
 
 Cookie expiry was shortened deterministically rather than waiting 12 hours.
 Renderer coverage differs by platform: Ubuntu and Windows used actual isolated

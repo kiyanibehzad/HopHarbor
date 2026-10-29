@@ -1,6 +1,6 @@
 # Windows panel authentication recovery
 
-The 1.3.2 build 12 Windows candidate adds native recovery when the panel's cookie expires or the controller invalidates a session without replacing its control file. A failed API request remains failed; the application does not replay a mutation after reauthentication. HTTP 403 locks the panel without automatic recovery. The explicit Retry button requests a fresh native bootstrap.
+The published 1.3.2 build 12 Windows preview adds native recovery when the panel's cookie expires or the controller invalidates a session without replacing its control file. A failed API request remains failed; the application does not replay a mutation after reauthentication. HTTP 403 locks the panel without automatic recovery. The explicit Retry button requests a fresh native bootstrap.
 
 ## Native trust and lifecycle
 
@@ -16,7 +16,9 @@ Automatic attempts are limited to three in a rolling minute, with at least two s
 - `tests/test_windows_panel_auth_native.py` is an opt-in Windows-only fixture. Build the Desktop with `PANEL_AUTH_TESTS` into a separate private payload, then run the fixture using that payload's embedded Python and `--app-root` / `--report`. The fixture uses the production Manager/Handler with a fresh protected data directory and synthetic loopback-only fault controls. The extra C# harness is entirely excluded from normal shipped builds.
 - The normal packaged `--smoke-test` additionally removes its synthetic panel cookie and verifies recovery without changing the controller. Its existing editor, appearance, tray, hide/reopen, navigation and controller-replacement checks remain in place.
 
-## Validation record
+## Publication-time Windows 10 x64 validation record
+
+Later testing of the same published files on Windows 11 Pro 24H2 ARM64 passed all six validation groups; see [the native ARM64 record](windows-arm64-validation-1.3.2.md). The following Windows 10 x64 results remain historical evidence.
 
 On 29 October 2026, 260 source tests ran: 259 passed and one isolated GOST test was skipped (the local GOST binary was absent). The compiled policy regression checked 37 assertions.
 
@@ -30,16 +32,16 @@ The corrected production x64 payload passed 12 lifecycle checks, including 10 pa
 
 Ten native security boundary checks passed using the unchanged helper binary, including protected files/locks, reparse/hardlink rejection, scoped Credential Manager/askpass behavior and owned Job cleanup. Python children now use `-B`; the corrected fixture was run successfully. Five actual x64 installer/uninstaller checks passed against the final setup hash: installed payload/ACLs, registration, controller health, settings preservation and removal of the synthetic installation. No test installation or synthetic default data remained.
 
-Both final portable payloads contain 336 manifest-verified files and match version 1.3.2/build 12. Both Inno installers were compiled on native x64 Windows and independently checked for resource version 1.3.2.12, checksums and private build-path leakage. Their setup engines are x64; their application payloads are respectively x64 and ARM64. Only the x64 installer was executed. These are local review artifacts, not a newly published release.
+Both final portable payloads contain 336 manifest-verified files and match version 1.3.2/build 12. Both Inno installers were compiled on native x64 Windows and independently checked for resource version 1.3.2.12, checksums and private build-path leakage. Their setup engines are x64; their application payloads are respectively x64 and ARM64. At that validation point only the x64 installer had been executed. These exact artifacts were subsequently published in v1.3.2; later native Windows 11 ARM64 testing also executed the unchanged ARM64 Setup via its x64 Inno engine.
 
-## Transfer timing limitation
+## Historical Windows 10 x64 transfer timing limitation
 
-The unchanged native protocol suite passed 19 of 20 cases in three candidate runs. Its 2 MiB raw stream test reached the four-second read deadline. Running that same unchanged suite on a clean copy of the previous published 1.3.0 preview reproduced the same failure (19/20). The frontend, native platform layer, SSH helpers and Python runtime are byte-identical between packages; the controller differs only in version/build constants.
+On Windows 10 x64, the unchanged native protocol suite passed 19 of 20 cases in three candidate runs. Its 2 MiB raw stream test reached the four-second read deadline. Running that same unchanged suite on a clean copy of the previous published 1.3.0 preview reproduced the same failure (19/20). The frontend, native platform layer, SSH helpers and Python runtime are byte-identical between packages; the controller differs only in version/build constants.
 
-Separate diagnostics received all 2,097,165 bytes and EOF: 3.051 seconds in isolation and 3.660 seconds in a full-suite timing run with an explicitly diagnostic 30-second deadline. Those diagnostics do **not** turn the original four-second failures into passes. The evidence supports a pre-existing timing/environment limitation rather than a demonstrated regression from panel recovery. Preview acceptance remains a Git & Release review decision; no production timeout or authoritative protocol test was changed.
+Separate diagnostics received all 2,097,165 bytes and EOF: 3.051 seconds in isolation and 3.660 seconds in a full-suite timing run with an explicitly diagnostic 30-second deadline. Those diagnostics do **not** turn the original four-second failures into passes. The evidence supports a pre-existing timing/environment limitation rather than a demonstrated regression from panel recovery. This was accepted as a disclosed pre-existing Windows preview limitation; no production timeout or authoritative protocol test was changed. The subsequent Windows 11 ARM64 run passed all 20 original cases with the same deadline. Its additional synthetic 2 MiB transfer completed in about 0.47 seconds with exact bytes and EOF. This new environment result does not turn the historical Windows 10 failures into passes or establish an Internet-speed improvement.
 
 ## Validation scope
 
-Native validation uses Windows 10 Pro 22H2 x64 as compatibility evidence. Cross-compiling an ARM64 package does not validate native ARM64 or Windows 11 behavior. Physical sleep, operating-system network/logon transitions, SSH-agent behavior, signing and reputation checks remain outside this recovery change's validation scope.
+Native validation now includes Windows 10 Pro 22H2 x64 compatibility evidence and the exact published 1.3.2/build 12 ARM64 payload on Windows 11 Pro 24H2 ARM64 (build 26100.7840). The product's Desktop, helper/controller, Python, OpenSSH and WebView2 were native ARM64; Inno engines and a separate synthetic test server used x64 emulation. The private test DLL differs from the shipped DLL; production lifecycle and actual installer checks use the published product payload. See [native ARM64 environment, identities and results](windows-arm64-validation-1.3.2.md).
 
-The candidate is local and unpublished. Test reports, temporary compilation inputs and remote-session captures are private and are not repository content.
+Windows remains Preview. Native Windows 11 x64, physical sleep, real OS network/logon/logout/RDP transitions, SSH-agent behavior, signing/reputation and clean unprovisioned-machine prerequisites remain unverified. The 12-hour cookie wait was not performed. Test reports, temporary compilation inputs and session captures remain private. This documentation update changes no product source, binaries, version, tag or runtime.

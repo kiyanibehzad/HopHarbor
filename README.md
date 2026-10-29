@@ -12,6 +12,7 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Win
 | --- | --- | --- | --- |
 | **macOS 13 or later** | **Apple Silicon / arm64** | 1.3.2 · build 12 (source) | [Build from source](#macos) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.3.2 · build 12 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview** | **ARM64:** Windows 11 24H2 native VM tested; **x64:** Windows 10 22H2 compatibility tested, native Windows 11 x64 unverified | 1.3.2 · build 12 | [Setup and ZIP guide](packaging/windows/README.md) |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
@@ -20,15 +21,26 @@ The native panels recover local sign-in after cookie expiry without restarting b
 ## Windows preview — 1.3.2 · build 12
 
 - **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [Download Setup — native execution not yet tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup — Windows 11 ARM64 tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
 - [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [Installation and usage](packaging/windows/README.md).
 
 Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client
 and Microsoft Edge WebView2 Runtime must already be available. Settings and
 credentials start empty; enter your own Sessions in the panel. The preview is
-unsigned. Native Windows 10 Pro 22H2 x64 forwarding, panel, installation and removal
-checks pass; native Windows 11/ARM64 and real sleep/network events remain
-unverified. An unchanged 2 MiB protocol test still exceeds its four-second deadline on both this candidate and the previous preview; this known preview limitation is documented. See [the validation record](docs/windows-panel-recovery.md).
+unsigned. The exact published ARM64 ZIP and Setup were tested on **Windows 11 Pro
+24H2 ARM64 (build 26100.7840)**, including recovery, credentials, forwarding and
+actual install/uninstall. The app, controller, Python, OpenSSH and WebView2 ran as
+ARM64; the Setup engine and separate synthetic test server ran as emulated x64.
+Windows 10 Pro 22H2 x64 compatibility evidence is also recorded. Windows remains
+**Preview**: native Windows 11 x64, physical sleep, real OS network/logon/RDP
+transitions, SSH-agent integration and signing/reputation remain unverified.
+
+The earlier Windows 10 x64 grouped 2 MiB/four-second failure remains a failed
+historical result, reproduced on the previous preview. Windows 11 ARM64 passed all
+20 original protocol cases with unchanged deadlines. Its additional synthetic
+2 MiB transfer completed in about 0.47 seconds; this is not an Internet-speed
+benchmark. See [ARM64 validation](docs/windows-arm64-validation-1.3.2.md) and
+[recovery and historical limits](docs/windows-panel-recovery.md).
 
 ## Install
 

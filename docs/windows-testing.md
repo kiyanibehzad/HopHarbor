@@ -1,4 +1,8 @@
-# Windows candidate validation
+# Windows validation records
+
+Current 1.3.2/build 12 evidence includes [native Windows 11 ARM64 validation](windows-arm64-validation-1.3.2.md) of the exact published ZIP and Setup, alongside [Windows 10 x64 recovery validation and its historical protocol deadline failure](windows-panel-recovery.md). Windows remains Preview; the later ARM64 results do not replace the historical outcomes below.
+
+## Historical 1.3.0/build 10 candidate validation
 
 Windows preview: **1.3.0, build 10**. Evidence recorded 28–29 October 2026.
 The local macOS installation and its active connections were kept separate.
@@ -51,7 +55,7 @@ The local macOS installation and its active connections were kept separate.
   preserving settings. The empty fixture settings were then removed only after
   service/lock and configuration checks. No saved credentials were deleted.
 
-## Remaining gates
+## Remaining gates at the historical 1.3.0 validation point
 
 Native Windows 11 and ARM64, SSH agent authentication, physical sleep/network
 changes, and login/logout or RDP-session transitions remain unverified. A loopback listener outage and an explicit call

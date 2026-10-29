@@ -6,19 +6,28 @@ Every platform uses one shared HopHarbor version and build.
 
 ## Download and install
 
-**HopHarbor 1.3.2 · build 12 — Windows preview** is available in the [shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2). Panel recovery and its frame protections have native Windows 10 x64 validation; [the recovery validation and known transfer deadline limitation](../../docs/windows-panel-recovery.md) describe the precise scope.
+**HopHarbor 1.3.2 · build 12 — Windows preview** is available in the [shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2). The exact published ARM64 ZIP and Setup have native Windows 11 Pro 24H2 ARM64 VM validation; Windows 10 x64 compatibility evidence is also recorded. See [ARM64 validation](../../docs/windows-arm64-validation-1.3.2.md) and [recovery and historical timing limits](../../docs/windows-panel-recovery.md).
 
 | Computer | Installer |
 | --- | --- |
 | Intel / AMD x64 | [Download x64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe) |
-| Windows 11 ARM64 | [Download ARM64 Setup — native execution unverified](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe) |
+| Windows 11 ARM64 | [Download ARM64 Setup — Windows 11 ARM64 tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe) |
 
 [Portable ZIPs](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) and [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) are also available. Run Setup as your ordinary signed-in user, choose the optional sign-in/desktop shortcuts, and open **HopHarbor** from Start. The installers are unsigned. Both setup engines are x64; the ARM64 installer contains the native ARM64 app payload and targets Windows 11 ARM64.
 
-Native Windows 10 Pro 22H2 x64 compatibility checks passed, including forwarding,
-WebView2 and actual installation/removal. Native Windows 11/ARM64, physical
-sleep/network events, SSH agent and signing/reputation remain unverified. This is
-a preview, not a stable support claim. See [the validation record](../../docs/windows-testing.md).
+Native Windows 11 Pro 24H2 ARM64 (build 26100.7840) checks passed for the exact
+published 1.3.2/build 12 files: 20 protocol, 10 security, 13 recovery, 12 production
+lifecycle, 19 forwarding and five actual install/uninstall checks. Desktop,
+helper/controller, Python, OpenSSH and WebView2 were ARM64. Inno Setup/uninstall
+engines and a separate synthetic SSH test server used x64 emulation. Native
+Windows 11 x64, physical sleep, real OS network/logon/RDP transitions, SSH-agent
+integration and signing/reputation remain unverified. Windows remains Preview;
+these VM results do not establish blanket Windows support.
+
+The prior Windows 10 x64 grouped 2 MiB/four-second failure remains historical and
+failed; the ARM64 run passed the unchanged 20-case suite. Its additional synthetic
+transfer took about 0.47 seconds with the same four-second bound, not a real
+Internet-speed measurement. [Detailed ARM64 record](../../docs/windows-arm64-validation-1.3.2.md).
 
 The desktop panel uses WinForms and Microsoft Edge WebView2. The independent
 background controller uses the Windows OpenSSH **Client**, embedded CPython and
@@ -125,6 +134,11 @@ compatibility. The panel content and tray retain System/Light/Dark appearance;
 the native titlebar follows the Windows 10 default because its documented dark
 titlebar attribute requires Windows 11.
 
+## Historical 1.3.0/build 10 evidence
+
+The following describes that earlier preview only; current 1.3.2 ARM64 results are
+[recorded separately](../../docs/windows-arm64-validation-1.3.2.md).
+
 Recorded evidence for the 1.3.0 build 10 preview: 250 host
 unit tests pass. Native Windows 10 x64 checks pass for private ACLs, separate
 credentials, process ownership, all 20 frontend protocol cases, 12 copied-payload
@@ -135,5 +149,6 @@ bounded logs and authenticated cleanup. Both Inno setup files compile and pass i
 checks. The actual x64 per-user install, controller launch and uninstall pass
 five native checks, including installed payload/ACL verification and owned
 cleanup. See [the validation record](../../docs/windows-testing.md).
-This is compatibility evidence; native Windows 11/ARM64, physical sleep and
-signing/reputation remain unverified.
+At that earlier validation point, this was compatibility evidence; native Windows
+11/ARM64, physical sleep and signing/reputation were unverified. The later ARM64
+testing above does not rewrite the earlier test outcomes.

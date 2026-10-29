@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.3.2 · بیلد 12 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.3.2 · بیلد 12 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview — آزمایشی** | **ARM64:** آزمون بومی در VM ویندوز 11 نسخهٔ 24H2؛ **x64:** آزمون سازگاری ویندوز 10 نسخهٔ 22H2، بدون تأیید بومی ویندوز 11 x64 | 1.3.2 · بیلد 12 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
@@ -20,10 +21,14 @@
 ## نسخهٔ آزمایشی ویندوز — 1.3.2 · بیلد 12
 
 - **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [دانلود نصب‌کننده — هنوز تست اجرایی نشده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده — آزموده‌شده روی Windows 11 ARM64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
 - [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [راهنمای نصب و استفاده](packaging/windows/README.md).
 
-نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد. تست اتصال‌ها، پنل و نصب و حذف روی Windows 10 Pro 22H2 x64 پاس شده‌اند؛ Windows 11، اجرای بومی ARM64 و خواب یا تغییر واقعی شبکه هنوز تأیید نشده‌اند. آزمون انتقال ۲ MiB با مهلت چهار ثانیه در این نسخه و پیش‌نمایش قبلی شکست می‌خورد؛ این محدودیت شناخته‌شدهٔ نسخهٔ آزمایشی ثبت شده است. [جزئیات آزمون‌ها](docs/windows-panel-recovery.md) مشخص است.
+نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد.
+
+همان فایل‌های ARM64 منتشرشده روی **Windows 11 Pro 24H2 ARM64، بیلد 26100.7840** در VM آزمایش شدند؛ بازیابی پنل، اعتبارنامه‌ها، اتصال و نصب/حذف واقعی موفق بودند. برنامه، کنترل‌گر، Python، OpenSSH و WebView2 بومی ARM64 بودند؛ موتور نصب و سرور مصنوعی جداگانهٔ آزمون با شبیه‌سازی x64 اجرا شدند. سابقهٔ سازگاری Windows 10 Pro 22H2 x64 نیز حفظ شده است. Windows همچنان **Preview — آزمایشی** است: اجرای بومی Windows 11 x64، خواب واقعی، تغییرات واقعی شبکه/ورود/RDP، یکپارچگی SSH-agent و امضا/اعتبار برنامه تأیید نشده‌اند.
+
+شکست قبلی آزمون گروهی انتقال ۲ MiB با مهلت چهار ثانیه در Windows 10 x64، که روی پیش‌نمایش قبلی هم تکرار شد، به‌عنوان نتیجهٔ ناموفق تاریخی حفظ می‌شود. در Windows 11 ARM64 هر ۲۰ آزمون اصلی پروتکل با همان مهلت‌ها پاس شدند؛ انتقال مصنوعی تکمیلی حدود ۰٫۴۷ ثانیه طول کشید و معیار سرعت اینترنت نیست. [اعتبارسنجی ARM64](docs/windows-arm64-validation-1.3.2.md) و [بازیابی و محدودیت‌های تاریخی](docs/windows-panel-recovery.md) جزئیات را دارند.
 
 ## نصب
 
