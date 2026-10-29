@@ -38,7 +38,7 @@ class Element {
   }
 }
 
-async function harness({bridge = true, hash = '', cookie = true, status = null} = {}) {
+async function harness({bridge = process.argv[4] || 'webkit', hash = '', cookie = true, status = null} = {}) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, new Element(id));
@@ -60,7 +60,10 @@ async function harness({bridge = true, hash = '', cookie = true, status = null} 
     matchMedia: () => ({matches: false, addEventListener() {}}),
     addEventListener() {}
   };
-  if (bridge) window.webkit = {messageHandlers: {hopharborPanel: {
+  if (bridge === 'webview2') window.chrome = {webview: {
+    postMessage: message => messages.push(JSON.parse(JSON.stringify(message)))
+  }};
+  else if (bridge) window.webkit = {messageHandlers: {hopharborPanel: {
     postMessage: message => messages.push(JSON.parse(JSON.stringify(message)))
   }}};
   const context = vm.createContext({

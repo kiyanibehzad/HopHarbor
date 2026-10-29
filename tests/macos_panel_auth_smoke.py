@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.parse
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,7 @@ class Fixture:
         self.always_unauthorized = False
         self.logins = 0
         self.rejected_bootstraps = 0
+        self.frame_requests = {}
         self.lock = threading.RLock()
         self.port = None
 
@@ -41,7 +43,8 @@ class Fixture:
         os.replace(temporary, self.data / 'control.json')
 
     def stats(self):
-        return {'logins': self.logins, 'rejected_bootstraps': self.rejected_bootstraps}
+        return {'logins': self.logins, 'rejected_bootstraps': self.rejected_bootstraps,
+                'frame_requests': dict(self.frame_requests)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -60,8 +63,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'"
-        # The synthetic child must execute to prove that the native main-frame
-        # guard rejects its message. Production panel responses retain DENY.
+        # Permit framing only for attack fixtures, so the native navigation
+        # decision, rather than frame-ancestors, must stop their scripts.
         if not fixture_frame:
             policy += "; frame-ancestors 'none'"
         self.send_header('Content-Security-Policy', policy)
@@ -74,11 +77,23 @@ class Handler(BaseHTTPRequestHandler):
         f = self.fixture
         if self.headers.get('Host') != '127.0.0.1:' + str(f.port):
             return self.reply(403, {'error': 'Host rejected by synthetic fixture.'})
-        if self.path == '/?fixture=frame':
-            child = (b'<script>window.webkit.messageHandlers.hopharborPanel.postMessage('
-                     b'{action:"reauthenticate",reason:"authentication"});'
-                     b'parent.document.documentElement.dataset.fixtureFrameDone="true";</script>')
-            return self.reply(200, child, 'text/html; charset=utf-8', fixture_frame=True)
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if query.get('fixture') == ['frame']:
+            case = query.get('case', [''])[0]
+            scripts = {
+                'direct': 'window.webkit.messageHandlers.hopharborPanel.postMessage',
+                'parent-native': 'parent.webkit.messageHandlers.hopharborPanel.postMessage',
+                'parent-wrapper': 'parent.postNativePanelMessage',
+                'popup': 'window.webkit.messageHandlers.hopharborPanel.postMessage',
+            }
+            if case not in scripts:
+                return self.reply(404, {'error': 'Unknown synthetic frame case.'})
+            with f.lock:
+                f.frame_requests[case] = f.frame_requests.get(case, 0) + 1
+            child = ('<script>parent.document.documentElement.dataset.fixtureFrameAttempted="true";'
+                     + scripts[case] + '({action:"reauthenticate",reason:"authentication"});'
+                     'parent.document.documentElement.dataset.fixtureFrameDone="true";</script>')
+            return self.reply(200, child.encode(), 'text/html; charset=utf-8', fixture_frame=True)
         if self.path.split('?', 1)[0] == '/api/state':
             with f.lock:
                 cookie = SimpleCookie(self.headers.get('Cookie', ''))

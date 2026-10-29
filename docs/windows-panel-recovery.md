@@ -1,0 +1,45 @@
+# Windows panel authentication recovery
+
+The 1.3.2 build 12 Windows candidate adds native recovery when the panel's cookie expires or the controller invalidates a session without replacing its control file. A failed API request remains failed; the application does not replay a mutation after reauthentication. HTTP 403 locks the panel without automatic recovery. The explicit Retry button requests a fresh native bootstrap.
+
+## Native trust and lifecycle
+
+The WinForms host accepts only the fixed `ready` and `reauthenticate` message shapes from the current owned WebView, current generation and exact `http://127.0.0.1:<validated-port>/` or `/index.html` URL. Extra fields, duplicate properties, foreign sources and other paths are rejected. Each WebView can load only its one native-created bootstrap document; subsequent document navigation is canceled. The native host rereads the protected control file and constructs the normal bootstrap URL itself. It does not inject the token into script or storage.
+
+The panel does not use child frames. WebView2's top-level message event alone cannot distinguish a same-origin child calling `parent.chrome.webview`. Therefore any `FrameCreated` event irrevocably disables messages for that document, cancels pending recovery and revokes its active-document state. All child navigation is canceled. A fresh native-created view is needed to restore the bridge. This deliberately fails closed if a future panel feature introduces an iframe; such a feature needs a separate security design.
+
+Automatic attempts are limited to three in a rolling minute, with at least two seconds between scheduled attempts and one pending recovery. Success does not reset the rolling budget. Manual Retry bypasses only the automatic count. Ready messages can cancel queued work only after current-document validation. Hide/disposal cancels recovery and load timers; generation checks reject late callbacks. Immediate reopen while an earlier asynchronous open is unwinding is remembered. Renderer failure and loading timeout use the same bounded scheduler. Recovery reads existing controller state and does not launch or restart the controller or its connections.
+
+## Test entry points
+
+- `tests/test_windows_panel_auth.py` compiles the actual independent C# policy when `HOPHARBOR_TEST_DOTNET` points to a .NET 10 SDK. It covers exact source and message validation, attempt limits, spacing and rolling expiry.
+- `tests/test_windows_panel_auth_native.py` is an opt-in Windows-only fixture. Build the Desktop with `PANEL_AUTH_TESTS` into a separate private payload, then run the fixture using that payload's embedded Python and `--app-root` / `--report`. The fixture uses the production Manager/Handler with a fresh protected data directory and synthetic loopback-only fault controls. The extra C# harness is entirely excluded from normal shipped builds.
+- The normal packaged `--smoke-test` additionally removes its synthetic panel cookie and verifies recovery without changing the controller. Its existing editor, appearance, tray, hide/reopen, navigation and controller-replacement checks remain in place.
+
+## Validation record
+
+On 29 October 2026, 260 source tests ran: 259 passed and one isolated GOST test was skipped (the local GOST binary was absent). The compiled policy regression checked 37 assertions.
+
+Thirteen native recovery checks passed with the real production Manager/Handler and WebView2: bootstrap/ready, child-frame rejection, 403/manual Retry, actual browser-cookie expiration, server-side invalidation, a failed POST observed exactly once, automatic-budget exhaustion/manual Retry, rejected-bootstrap loop prevention, pending/stale-ready guards, hide/reopen, hide during asynchronous opening, an actual renderer crash observed through `ProcessFailed`, and unchanged control plus empty secret storage. The about:blank attack executed inline child code synchronously and attempted both `parent.chrome.webview.postMessage` and the parent's shared adapter; native ready/recovery counters did not change. Srcdoc and URL child navigations were canceled. Foreign origin/path and stale generation checks were injected into the native handler directly; those are guard tests, not claims of cross-origin navigation.
+
+The cookie test shortened the synthetic browser cookie to one second and observed its actual removal. It did not wait twelve hours or perform physical sleep. The renderer test used `Page.crash` only in the disposable test WebView and observed the real failure callback. Automatic recovery remained blocked by the exhausted budget and explicit recovery created a working fresh view. The diagnostic counter named `automaticRecoveries` includes manual recoveries as well; eight total replacements in that fixture do not represent eight automatic attempts.
+
+The default Desktop build metadata now agrees with the shared 1.3.2/build 12 version. A shared regression checks native project and installer defaults. The native boundary fixture disables bytecode generation in its Python children so testing does not add unlisted cache files to a reviewed package.
+
+The corrected production x64 payload passed 12 lifecycle checks, including 10 packaged WebView2 assertions for the displayed version/build, missing-cookie recovery, editor, themes, tray, hide/reopen, navigation and replacement-controller recovery. All 19 native forwarding checks passed, covering independent two-hop credentials, strict host-key failures, SOCKS/HTTP/fixed TCP, Schannel TLS with a signed loopback CRL, pool failure/outage recovery, bounded logs and owned cleanup. The deterministic wake-handler fixture recovered in 5.28 seconds; it was not physical sleep.
+
+Ten native security boundary checks passed using the unchanged helper binary, including protected files/locks, reparse/hardlink rejection, scoped Credential Manager/askpass behavior and owned Job cleanup. Python children now use `-B`; the corrected fixture was run successfully. Five actual x64 installer/uninstaller checks passed against the final setup hash: installed payload/ACLs, registration, controller health, settings preservation and removal of the synthetic installation. No test installation or synthetic default data remained.
+
+Both final portable payloads contain 336 manifest-verified files and match version 1.3.2/build 12. Both Inno installers were compiled on native x64 Windows and independently checked for resource version 1.3.2.12, checksums and private build-path leakage. Their setup engines are x64; their application payloads are respectively x64 and ARM64. Only the x64 installer was executed. These are local review artifacts, not a newly published release.
+
+## Transfer timing limitation
+
+The unchanged native protocol suite passed 19 of 20 cases in three candidate runs. Its 2 MiB raw stream test reached the four-second read deadline. Running that same unchanged suite on a clean copy of the previous published 1.3.0 preview reproduced the same failure (19/20). The frontend, native platform layer, SSH helpers and Python runtime are byte-identical between packages; the controller differs only in version/build constants.
+
+Separate diagnostics received all 2,097,165 bytes and EOF: 3.051 seconds in isolation and 3.660 seconds in a full-suite timing run with an explicitly diagnostic 30-second deadline. Those diagnostics do **not** turn the original four-second failures into passes. The evidence supports a pre-existing timing/environment limitation rather than a demonstrated regression from panel recovery. Preview acceptance remains a Git & Release review decision; no production timeout or authoritative protocol test was changed.
+
+## Validation scope
+
+Native validation uses Windows 10 Pro 22H2 x64 as compatibility evidence. Cross-compiling an ARM64 package does not validate native ARM64 or Windows 11 behavior. Physical sleep, operating-system network/logon transitions, SSH-agent behavior, signing and reputation checks remain outside this recovery change's validation scope.
+
+The candidate is local and unpublished. Test reports, temporary compilation inputs and remote-session captures are private and are not repository content.

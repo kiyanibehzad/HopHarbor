@@ -1,6 +1,44 @@
 # macOS panel recovery
 
-Source update: **1.3.1, build 11**. Recorded **29 October 2026**.
+Current source update: **1.3.2, build 12**. Recorded **29 October 2026**.
+
+## Child-frame isolation in 1.3.2
+
+A same-origin iframe can call `parent.webkit.messageHandlers.hopharborPanel`
+or the parent's `postNativePanelMessage` function. In actual WKWebView checks,
+both calls were reported as main-frame messages and passed the earlier message
+guard. Checking a direct child message alone did not cover these parent calls.
+This demonstrated a gap in the frame-isolation contract; it did not establish
+a production injection path, token disclosure or server authentication bypass.
+
+The native navigation delegate now accepts navigation decisions only from its
+current WebView and only for a main-frame destination. Child-frame and popup
+destinations are canceled before child content can load or execute. The panel
+does not require embedded documents. Existing main-frame local navigation,
+the explicit repository link and the message origin/path/shape checks remain
+in place. Late navigation decisions from a discarded view are canceled too.
+
+The updated opt-in runner passed **13 actual AppDelegate/WKWebView checks**
+using an ephemeral store and a synthetic loopback service. Three separate child
+fixtures attempt a direct native bridge call, a parent native bridge call and a
+parent wrapper call. Each was canceled by native navigation, produced **zero
+child HTTP requests**, executed no child script and caused no panel recovery.
+Only the fixture child responses permit framing, so a response's
+`frame-ancestors` policy cannot explain those results. A popup also made no
+child request. Main-frame malformed-message rejection, cookie/session recovery,
+manual Retry, the automatic recovery budget, ready-message cancellation,
+renderer handling, stale navigation and hide/reopen checks passed.
+
+The source suite ran 258 tests: 257 passed and the optional local GOST fixture
+check was skipped because that separate worktree had no GOST binary. Its 28
+compiled Swift policy assertions and 14 JavaScript behavior subcases passed.
+The production macOS launcher also compiled without the test-only hooks.
+
+This is a source-only change. No installed app, live controller, connection or
+saved setting was replaced or restarted, and no new macOS binary was published.
+It does not claim a 12-hour wait, physical sleep or a forced renderer crash.
+
+## Earlier 1.3.1 panel recovery
 
 This update changes the macOS panel and its web interface. The local deployment
 keeps the existing background controller, SSH processes, proxy listeners and
@@ -39,7 +77,7 @@ form submission is automatically replayed after authentication is restored.
 Use **Reload Panel** from the HopHarbor menu when a manual reload is needed.
 This reloads the interface while leaving background connections running.
 
-## Validation record
+## Historical 1.3.1 validation record
 
 The following checks passed on Apple Silicon macOS using generated local data:
 
@@ -52,7 +90,7 @@ The following checks passed on Apple Silicon macOS using generated local data:
 | Missing WebKit cookie and invalidated server session | Both recovered automatically through fresh authentication |
 | Explicit Retry with corrected private access settings | Passed; rejected initial sign-in stayed bounded |
 | Persistent HTTP 401 responses | Stopped after three automatic recovery attempts; Retry worked after correction |
-| Real subframe, malformed messages and stale view callbacks | Rejected; successful readiness also canceled an already queued recovery |
+| Direct child-frame message, malformed messages and stale view callbacks | Rejected; this earlier test did not cover calls through the parent bridge or wrapper |
 | Controlled renderer termination callback | Rebuilt the panel successfully |
 | Hide/reopen lifecycle | Discarded the page, canceled pending recovery and authenticated a fresh page on reopen |
 

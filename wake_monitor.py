@@ -58,12 +58,36 @@ class _LinuxWakeReader:
         return self.generation, 0
 
 
+class _WindowsWakeReader(_LinuxWakeReader):
+    """Windows boot ticks include suspend; unbiased interrupt time excludes it."""
+    def __init__(self, boot_clock=None, monotonic_clock=None):
+        if boot_clock is None or monotonic_clock is None:
+            self.library = ctypes.WinDLL('kernel32', use_last_error=True)
+            self.ticks = self.library.GetTickCount64
+            self.ticks.argtypes = []
+            self.ticks.restype = ctypes.c_ulonglong
+            self.unbiased = self.library.QueryUnbiasedInterruptTime
+            self.unbiased.argtypes = [ctypes.POINTER(ctypes.c_ulonglong)]
+            self.unbiased.restype = ctypes.c_int
+            boot_clock = boot_clock or (lambda: self.ticks() / 1000)
+            monotonic_clock = monotonic_clock or self.awake_seconds
+        super().__init__(boot_clock=boot_clock, monotonic_clock=monotonic_clock)
+
+    def awake_seconds(self):
+        value = ctypes.c_ulonglong()
+        if not self.unbiased(ctypes.byref(value)):
+            raise OSError('The Windows unbiased clock could not be read.')
+        return value.value / 10_000_000
+
+
 def _native_reader():
     try:
         if sys.platform == 'darwin':
             return _NativeWakeReader()
         if sys.platform.startswith('linux'):
             return _LinuxWakeReader()
+        if sys.platform == 'win32':
+            return _WindowsWakeReader()
     except (AttributeError, OSError):
         pass
     return None

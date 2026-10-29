@@ -6,17 +6,20 @@ only by main(), so the input validation can also be tested without a desktop.
 """
 import argparse
 import hashlib
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
 import stat
 import sys
+import time
 from urllib.parse import quote, urlsplit
 
 
-VERSION = '1.3.1'
-BUILD = '11'
+VERSION = '1.3.2'
+BUILD = '12'
 REPOSITORY_URL = 'https://github.com/kiyanibehzad/HopHarbor'
+PANEL_CONTENT_POLICY = "script-src 'none'; frame-src 'none'; child-src 'none'"
 
 
 def default_data_dir(environ=None, home=None):
@@ -86,6 +89,126 @@ def bootstrap_script(dark):
             'window.HopHarborSystemDark=%s;' % (metadata, json.dumps(bool(dark))))
 
 
+def panel_location_allowed(uri, port):
+    return navigation_allowed(uri, port) and urlsplit(uri).path in ('/', '/index.html')
+
+
+def recovery_message(value):
+    if not isinstance(value, dict):
+        return None
+    if value == {'action': 'ready'}:
+        return 'ready'
+    if (set(value) == {'action', 'reason'} and value['action'] == 'reauthenticate'
+            and value['reason'] in ('authentication', 'retry')):
+        return value['reason']
+    return None
+
+
+class RecoveryBudget:
+    """One application-wide rolling budget, retained across destroyed pages."""
+    def __init__(self):
+        self.attempts = []
+        self.last_scheduled = None
+
+    def delay(self, manual=False, now=None):
+        now = time.monotonic() if now is None else now
+        self.attempts = [stamp for stamp in self.attempts if now - stamp < 60]
+        if not manual and len(self.attempts) >= 3:
+            return None
+        delay = max(0, 2 - (now - self.last_scheduled)) if self.last_scheduled is not None else 0
+        self.last_scheduled = now + delay
+        if not manual:
+            self.attempts.append(now + delay)
+        return delay
+
+    def authenticated(self):
+        self.attempts.clear()
+
+
+def recovery_scripts(port):
+    """Public fixed-command facade; native handler exists ONLY in an isolated world.
+
+    GTK's message callback lacks sender frame metadata. The isolated TOP_FRAME
+    receiver verifies browser-generated MessageEvents from its own window and
+    exact origin, rather than trusting fields supplied by the page. The public
+    facade has no access to the native receiver or any control-file credentials.
+    """
+    origin = json.dumps('http://127.0.0.1:%d' % port)
+    guard = ('if(window!==window.top||location.origin!==%s||'
+             "!['/','/index.html'].includes(location.pathname))return;" % origin)
+    validate = """const valid=m=>m&&typeof m==='object'&&!Array.isArray(m)&&(
+      (Object.keys(m).length===1&&m.action==='ready')||
+      (Object.keys(m).length===2&&m.action==='reauthenticate'&&
+       ['authentication','retry'].includes(m.reason)));"""
+    facade = ('(()=>{' + guard + """
+      // Keep the original WindowProxy as the method receiver. A wrapper OR a
+      // bound function changes the incumbent realm for a child calling its
+      // parent's facade, incorrectly giving that child a top-window identity.
+      Object.defineProperty(window,'webkit',{value:Object.freeze({messageHandlers:
+        Object.freeze({hopharborPanel:window})}),configurable:false,writable:false});
+    })();""")
+    receiver = ('(()=>{' + guard + validate + """
+      const send=window.webkit.messageHandlers.hopharborPanelReceiver.postMessage.bind(
+        window.webkit.messageHandlers.hopharborPanelReceiver);
+      window.addEventListener('message',event=>{
+        if(!event.isTrusted||event.source!==window||event.origin!==""" + origin + """||
+           location.origin!==""" + origin + """||!['/','/index.html'].includes(location.pathname))return;
+        try{const m=event.data;if(valid(m)){
+          const text=JSON.stringify(m);if(text.length<=160)send(text);
+        }}catch{}
+      });
+    })();""")
+    return facade, receiver
+
+
+def trusted_panel_scripts(app_dir):
+    """Run reviewed installed scripts only in TOP_FRAME, never child markup.
+
+    WebView's native default CSP disables every content script and child load.
+    UserContentManager bypasses CSP, so the unchanged installed panel scripts can
+    be injected into the main document only. The controller's policy still adds
+    its Host/Origin/CSRF and other content restrictions independently.
+    """
+    root = Path(app_dir) / 'web'
+
+    class PanelScripts(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.active = None
+            self.scripts = []
+            self.external_count = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag == 'script':
+                if self.active is not None or any(key != 'src' for key, _ in attrs):
+                    raise ValueError('Unsupported panel script.')
+                source = dict(attrs).get('src')
+                if source not in (None, '/app.js'):
+                    raise ValueError('Unsupported panel script source.')
+                self.active = (source, [])
+
+        def handle_data(self, text):
+            if self.active is not None:
+                self.active[1].append(text)
+
+        def handle_endtag(self, tag):
+            if tag == 'script' and self.active is not None:
+                source, parts = self.active
+                if source:
+                    self.external_count += 1
+                    self.scripts.append((root / 'app.js').read_text(encoding='utf-8'))
+                else:
+                    self.scripts.append(''.join(parts))
+                self.active = None
+
+    parser = PanelScripts()
+    parser.feed((root / 'index.html').read_text(encoding='utf-8'))
+    parser.close()
+    if parser.active is not None or parser.external_count != 1:
+        raise ValueError('The panel scripts are incomplete.')
+    return tuple(parser.scripts)
+
+
 def icon_directory(app_dir):
     root = Path(app_dir)
     for directory in (root / 'assets', root / 'packaging/assets'):
@@ -122,6 +245,11 @@ def desktop_application(data_dir, app_dir):
             self.held = False
             self.assets = icon_directory(app_dir)
             self.context = None
+            self.generation = 0
+            self.recovery_budget = RecoveryBudget()
+            self.recovery_source = None
+            self.load_timeout_source = None
+            self.panel_active = False
 
         def do_startup(self):
             Gtk.Application.do_startup(self)
@@ -149,6 +277,9 @@ def desktop_application(data_dir, app_dir):
             return 0
 
         def do_activate(self):
+            if not self.panel_active and self.browser is not None:
+                self.discard_page()
+            self.panel_active = True
             if self.browser is None:
                 self.load_panel()
             self.window.show_all()
@@ -229,8 +360,14 @@ def desktop_application(data_dir, app_dir):
             return False
 
         def discard_page(self):
+            self.generation += 1
+            self.cancel_recovery()
+            self.cancel_load_timeout()
             if self.browser is not None:
                 browser, self.browser = self.browser, None
+                scripts = browser.get_user_content_manager()
+                scripts.unregister_script_message_handler_in_world(
+                    'hopharborPanelReceiver', 'HopHarborPanel')
                 browser.stop_loading()
                 browser.destroy()
             self.active_port = None
@@ -238,6 +375,9 @@ def desktop_application(data_dir, app_dir):
                 child.destroy()
 
         def close_panel(self, *_args):
+            self.panel_active = False
+            self.cancel_recovery()
+            self.cancel_load_timeout()
             if self.indicator is not None:
                 self.discard_page()
                 self.window.hide()
@@ -295,6 +435,12 @@ def desktop_application(data_dir, app_dir):
         def load_panel(self):
             self.discard_page()
             try:
+                panel_scripts = trusted_panel_scripts(app_dir)
+            except (OSError, ValueError, UnicodeError):
+                self.show_error('The panel files are not ready.',
+                                'Restore the reviewed HopHarbor application files and try again.')
+                return
+            try:
                 port, token = read_control(data_dir)
             except (OSError, ValueError, TypeError, AttributeError, UnicodeError):
                 self.show_error('The background service is not ready.',
@@ -302,11 +448,29 @@ def desktop_application(data_dir, app_dir):
                 return
             self.active_port = port
             scripts = WebKit2.UserContentManager()
+            generation = self.generation
+            scripts.connect('script-message-received::hopharborPanelReceiver',
+                            lambda manager, value: self.panel_message(
+                                browser, generation, value))
+            if not scripts.register_script_message_handler_in_world(
+                    'hopharborPanelReceiver', 'HopHarborPanel'):
+                self.show_error('Unable to open the panel.', 'Try opening HopHarbor again.')
+                return
+            facade, receiver = recovery_scripts(port)
+            scripts.add_script(WebKit2.UserScript.new_for_world(
+                receiver, WebKit2.UserContentInjectedFrames.TOP_FRAME,
+                WebKit2.UserScriptInjectionTime.START, 'HopHarborPanel', None, None))
             scripts.add_script(WebKit2.UserScript.new(
-                bootstrap_script(self.dark), WebKit2.UserContentInjectedFrames.TOP_FRAME,
+                bootstrap_script(self.dark) + facade, WebKit2.UserContentInjectedFrames.TOP_FRAME,
                 WebKit2.UserScriptInjectionTime.START, None, None))
-            browser = WebKit2.WebView(web_context=self.web_context(), user_content_manager=scripts)
+            for source in panel_scripts:
+                scripts.add_script(WebKit2.UserScript.new(
+                    source, WebKit2.UserContentInjectedFrames.TOP_FRAME,
+                    WebKit2.UserScriptInjectionTime.END, None, None))
+            browser = WebKit2.WebView(web_context=self.web_context(), user_content_manager=scripts,
+                                     default_content_security_policy=PANEL_CONTENT_POLICY)
             self.browser = browser
+            self.initial_navigation = True
             settings = browser.get_settings()
             settings.set_property('javascript-can-open-windows-automatically', False)
             settings.set_property('allow-file-access-from-file-urls', False)
@@ -317,9 +481,85 @@ def desktop_application(data_dir, app_dir):
             browser.connect('run-file-chooser', self.deny_file_chooser)
             browser.connect('load-failed', self.load_failed)
             browser.connect('load-changed', self.load_changed)
+            browser.connect('web-process-terminated', self.renderer_terminated)
             self.content.pack_start(browser, True, True, 0)
             browser.show()
             browser.load_uri(panel_url(port, token))
+            self.load_timeout_source = GLib.timeout_add_seconds(
+                20, self.load_timed_out, browser, generation)
+
+        def owned_page(self, browser, generation):
+            return (browser is self.browser and generation == self.generation
+                    and self.panel_active and self.active_port is not None)
+
+        def current_page(self, browser, generation):
+            return (self.owned_page(browser, generation)
+                    and panel_location_allowed(browser.get_uri(), self.active_port))
+
+        def panel_message(self, browser, generation, result):
+            if not self.current_page(browser, generation):
+                return
+            try:
+                value = result.get_js_value()
+                if not value.is_string():
+                    return
+                text = value.to_string()
+                if len(text) > 160:
+                    return
+                action = recovery_message(json.loads(text))
+            except (ValueError, TypeError, AttributeError):
+                return
+            if action == 'ready':
+                self.cancel_recovery()
+                self.cancel_load_timeout()
+                self.recovery_budget.authenticated()
+            elif action in ('authentication', 'retry'):
+                self.cancel_load_timeout()
+                self.schedule_recovery(browser, generation, manual=action == 'retry')
+
+        def cancel_recovery(self):
+            if self.recovery_source is not None:
+                GLib.source_remove(self.recovery_source)
+                self.recovery_source = None
+
+        def cancel_load_timeout(self):
+            if self.load_timeout_source is not None:
+                GLib.source_remove(self.load_timeout_source)
+                self.load_timeout_source = None
+
+        def schedule_recovery(self, browser, generation, manual=False, native_failure=False):
+            # A terminated renderer may have no URI. Native failure signals have
+            # browser identity; script messages additionally require a live URL.
+            valid = self.owned_page if native_failure else self.current_page
+            if (not valid(browser, generation)
+                    or self.recovery_source is not None):
+                return False
+            delay = self.recovery_budget.delay(manual)
+            if delay is None:
+                return False
+
+            def recover():
+                self.recovery_source = None
+                if valid(browser, generation):
+                    self.load_panel()
+                return GLib.SOURCE_REMOVE
+
+            self.recovery_source = GLib.timeout_add(max(1, int(delay * 1000) + 1), recover)
+            return True
+
+        def load_timed_out(self, browser, generation):
+            self.load_timeout_source = None
+            if self.owned_page(browser, generation) and self.recovery_source is None:
+                if not self.schedule_recovery(browser, generation, native_failure=True):
+                    self.panel_failure(browser)
+            return GLib.SOURCE_REMOVE
+
+        def renderer_terminated(self, browser, _reason):
+            if browser is self.browser:
+                self.cancel_load_timeout()
+                if (self.recovery_source is None
+                        and not self.schedule_recovery(browser, self.generation, native_failure=True)):
+                    self.panel_failure(browser)
 
         def deny_permission(self, _browser, request):
             request.deny()
@@ -329,7 +569,10 @@ def desktop_application(data_dir, app_dir):
             request.cancel()
             return True
 
-        def decide_policy(self, _browser, decision, kind):
+        def decide_policy(self, browser, decision, kind):
+            if browser is not self.browser:
+                decision.ignore()
+                return True
             if kind in (WebKit2.PolicyDecisionType.NAVIGATION_ACTION,
                         WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION):
                 action = decision.get_navigation_action()
@@ -341,7 +584,12 @@ def desktop_application(data_dir, app_dir):
                     decision.ignore()
                     return True
                 allowed = (kind == WebKit2.PolicyDecisionType.NAVIGATION_ACTION
-                           and navigation_allowed(uri, self.active_port))
+                           and self.initial_navigation
+                           and panel_location_allowed(uri, self.active_port))
+                if allowed:
+                    # One document per WebView. Native reload creates a new view;
+                    # old documents cannot send late ready/recovery messages.
+                    self.initial_navigation = False
             elif kind == WebKit2.PolicyDecisionType.RESPONSE:
                 uri = decision.get_response().get_uri()
                 allowed = navigation_allowed(uri, self.active_port) and decision.is_mime_type_supported()
@@ -356,17 +604,28 @@ def desktop_application(data_dir, app_dir):
             if error.matches(WebKit2.NetworkError.quark(), WebKit2.NetworkError.CANCELLED):
                 return True
             # Do not copy failed URLs or WebKit errors: bootstrap fragments hold tokens.
-            GLib.idle_add(self.panel_failure, browser)
+            GLib.idle_add(self.recover_load_failure, browser, self.generation)
             return True
 
+        def recover_load_failure(self, browser, generation):
+            if self.owned_page(browser, generation):
+                self.cancel_load_timeout()
+                if (self.recovery_source is None
+                        and not self.schedule_recovery(browser, generation, native_failure=True)):
+                    self.panel_failure(browser)
+            return GLib.SOURCE_REMOVE
+
         def panel_failure(self, browser):
-            if browser is self.browser:
+            if browser is self.browser and self.panel_active:
                 self.show_error('Unable to connect to the panel.',
                                 'Check that the HopHarbor user service is running and try again.')
             return GLib.SOURCE_REMOVE
 
         def load_changed(self, browser, event):
             if browser is self.browser and event == WebKit2.LoadEvent.FINISHED:
+                # This watchdog covers document loading, not authentication.
+                # A rejected bootstrap or 403 must stay locked until Retry.
+                self.cancel_load_timeout()
                 self.update_web_appearance()
 
         def do_shutdown(self):

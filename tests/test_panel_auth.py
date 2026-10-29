@@ -11,10 +11,13 @@ NODE = shutil.which('node')
 @unittest.skipUnless(NODE, 'Node.js is needed for browser behavior checks')
 class PanelAuthenticationTests(unittest.TestCase):
     def run_case(self, name):
-        result = subprocess.run(
-            [NODE, str(ROOT / 'tests/panel_auth_behavior.js'), str(ROOT / 'web/app.js'), name],
-            capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for transport in ('webkit', 'webview2'):
+            with self.subTest(transport=transport):
+                result = subprocess.run(
+                    [NODE, str(ROOT / 'tests/panel_auth_behavior.js'),
+                     str(ROOT / 'web/app.js'), name, transport],
+                    capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_expired_cookie_requests_one_native_recovery(self):
         self.run_case('expired_cookie_requests_one_native_recovery')

@@ -1,34 +1,34 @@
 # HopHarbor
 
-A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with SOCKS/HTTP forwarding, SSH jump chains and connection pools.
+A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
 [فارسی: راهنمای نصب و استفاده](README.fa.md) · [Downloads and releases](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
 ## Supported systems
 
-| Operating system | Supported hardware | Current app version | Installation |
+**HopHarbor 1.3.2 · build 12** uses one shared source and release tag across macOS, Ubuntu and the Windows preview. [Release notes and validation](docs/release-1.3.2.md).
+
+| Operating system | Supported hardware | Latest published app | Installation |
 | --- | --- | --- | --- |
-| **macOS 13 or later** | **Apple Silicon / arm64** | 1.3.1 · build 11 (source) | [Build from source](#macos) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.2.1 · build 9 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **macOS 13 or later** | **Apple Silicon / arm64** | 1.3.2 · build 12 (source) | [Build from source](#macos) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.3.2 · build 12 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
-**New source builds use one shared app version and build number: 1.3.1 · build 11.** Existing Ubuntu packages and the Windows preview below retain their published versions; their next rebuilt update joins the common version. Existing release tags and downloads are preserved.
+The native panels recover local sign-in after cookie expiry without restarting background connections. Native frame protections reject child-frame access to recovery. Existing releases remain available. [macOS](docs/macos-panel-recovery.md), [Ubuntu](docs/ubuntu-panel-recovery.md) and [Windows](docs/windows-panel-recovery.md) validation records describe the tested scope.
 
-The macOS panel update restores its local sign-in when panel access is lost and adds recovery for an interrupted page. Reloading the panel leaves background SSH connections running. See the [panel recovery and validation record](docs/macos-panel-recovery.md).
+## Windows preview — 1.3.2 · build 12
 
-## Windows preview — 1.3.0 · build 10
-
-- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [Download Setup — native execution not yet tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
-- [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [Installation and usage](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/packaging/windows/README.md).
+- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup — native execution not yet tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
+- [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [Installation and usage](packaging/windows/README.md).
 
 Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client
 and Microsoft Edge WebView2 Runtime must already be available. Settings and
 credentials start empty; enter your own Sessions in the panel. The preview is
 unsigned. Native Windows 10 Pro 22H2 x64 forwarding, panel, installation and removal
 checks pass; native Windows 11/ARM64 and real sleep/network events remain
-unverified. See [the validation record](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/docs/windows-testing.md).
+unverified. An unchanged 2 MiB protocol test still exceeds its four-second deadline on both this candidate and the previous preview; this known preview limitation is documented. See [the validation record](docs/windows-panel-recovery.md).
 
 ## Install
 
@@ -36,21 +36,21 @@ unverified. See [the validation record](https://github.com/kiyanibehzad/HopHarbo
 
 Download the package for your Ubuntu computer, then run the matching command from its download folder:
 
-**Intel / AMD (amd64):** [Download hopharbor_1.2.1_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_amd64.deb)
+**Intel / AMD (amd64):** [Download hopharbor_1.3.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.2.1_amd64.deb
+sudo apt install ./hopharbor_1.3.2_amd64.deb
 ```
 
-**ARM64 (arm64):** [Download hopharbor_1.2.1_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_arm64.deb)
+**ARM64 (arm64):** [Download hopharbor_1.3.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.2.1_arm64.deb
+sudo apt install ./hopharbor_1.3.2_arm64.deb
 ```
 
 Open **HopHarbor** from Applications. Packages include the verified GOST dependency; APT installs the required desktop libraries. Add your own Sessions and port forwards in the panel.
 
-[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/HopHarbor-Ubuntu-1.2.1-SHA256SUMS.txt)
+[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt)
 
 ### macOS
 
@@ -59,7 +59,7 @@ For **macOS 13+ on Apple Silicon**. The current installation method builds the a
 Review the source, then run:
 
 ```sh
-git clone https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.3.2 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -73,7 +73,7 @@ The installer builds the native app and Keychain helper, installs a per-user Lau
 
 HopHarbor keeps SSH connections in a background service separate from its desktop panel. macOS uses its system OpenSSH client, launchd, Keychain and a native Dock/menu bar app. Ubuntu uses OpenSSH, a per-user systemd service, GNOME Keyring / Secret Service, and GTK/WebKitGTK with an application indicator. Closing either panel keeps connections running.
 
-GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution; it is not built into either operating system. Public packages and source contain no personal Sessions, credentials or keys.
+GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution on macOS and Ubuntu. The Windows preview uses system OpenSSH, a per-user controller, Windows Credential Manager, a WebView2/tray panel and the project's own Python proxy frontend; it ships no GOST executable. Public packages and source contain no personal Sessions, credentials or keys.
 
 ## Screenshots
 

@@ -13,7 +13,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,24 +148,15 @@ def main():
                 app.activate()
                 checks.append('missing indicator safely retains accessible minimized window')
 
-            attempted = []
-
-            original_policy = linux_desktop.navigation_allowed
-
-            def observe(uri, active_port):
-                allowed = original_policy(uri, active_port)
-                if uri == 'https://example.invalid/':
-                    attempted.append(allowed)
-                return allowed
-
-            # Observe the actual policy predicate called by the connected GTK
-            # handler. No extra signal handler can consume or bypass its result.
-            with mock.patch.object(linux_desktop, 'navigation_allowed', side_effect=observe):
-                app.browser.load_uri('https://example.invalid/')
-                wait_for(lambda: attempted, 'external navigation decision')
-                assert attempted == [False]
-                wait_for(lambda: not app.browser.is_loading(), 'cancelled external navigation')
-                assert evaluate(app.browser, 'document.getElementById("pageTitle")?.textContent') == 'Overview'
+            # Observe the real resulting document rather than requiring a
+            # particular internal predicate order in the native policy.
+            original_browser, original_uri = app.browser, app.browser.get_uri()
+            app.browser.load_uri('https://example.invalid/')
+            deadline = time.monotonic() + .4
+            wait_for(lambda: time.monotonic() >= deadline, 'external navigation policy', timeout=2)
+            wait_for(lambda: not app.browser.is_loading(), 'cancelled external navigation')
+            assert app.browser is original_browser and app.browser.get_uri() == original_uri
+            assert evaluate(app.browser, 'document.getElementById("pageTitle")?.textContent') == 'Overview'
             checks.append('external navigation does not replace the trusted panel')
 
             if args.screenshot:

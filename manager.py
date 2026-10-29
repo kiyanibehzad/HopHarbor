@@ -3,7 +3,6 @@
 import argparse
 import base64
 import datetime
-import fcntl
 import hashlib
 import hmac
 import http.cookies
@@ -13,7 +12,6 @@ import json
 import os
 from pathlib import Path
 import re
-import resource
 import secrets
 import signal
 import socket
@@ -24,15 +22,86 @@ import time
 import urllib.parse
 import uuid
 
+if sys.platform == 'win32':
+    sys.dont_write_bytecode = True
+    fcntl = resource = None
+else:
+    import fcntl
+    import resource
+
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
 
-VERSION = '1.3.1'
-BUILD = 11
+VERSION = '1.3.2'
+BUILD = 12
 MAC_VERSION = VERSION
 MAC_BUILD = BUILD
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 USER_RE = re.compile(r'^[a-zA-Z0-9_][a-zA-Z0-9_.@-]{0,63}$')
+
+
+def windows_support():
+    """Load native Windows facilities only on the platform that needs them."""
+    import windows_platform
+    return windows_platform
+
+
+def system_executable(name):
+    if sys.platform == 'win32':
+        return windows_support().system_executable(name)
+    return '/usr/bin/' + name
+
+
+def gost_executable(app):
+    return Path(app) / 'bin/gost'
+
+
+def windows_proxy_descriptor(tunnel, backend_ports):
+    return {'schema': 1, 'id': tunnel['id'], 'kind': tunnel['kind'],
+            'listen_port': tunnel['local_port'], 'backend_ports': list(backend_ports)}
+
+
+def is_windows_proxy_descriptor(config, ident):
+    if not isinstance(config, dict) or set(config) != {'schema', 'id', 'kind', 'listen_port', 'backend_ports'}:
+        return False
+    ports = config.get('backend_ports')
+    return (type(config['schema']) is int and config['schema'] == 1 and config['id'] == ident
+            and config['kind'] in ('socks', 'http', 'local')
+            and type(config['listen_port']) is int and 1024 <= config['listen_port'] <= 65535
+            and isinstance(ports, list) and 1 <= len(ports) <= 4
+            and all(type(port) is int and 1024 <= port <= 65535 for port in ports)
+            and len(set(ports)) == len(ports) and config['listen_port'] not in ports)
+
+
+def read_private_text(path):
+    path = Path(path)
+    if sys.platform == 'win32':
+        with os.fdopen(windows_support().open_private_file(path, os.O_RDONLY, 0o600),
+                       'r', encoding='utf-8') as handle:
+            return handle.read()
+    return path.read_text(encoding='utf-8')
+
+
+def private_open(path, flags):
+    if sys.platform == 'win32':
+        return windows_support().open_private_file(path, flags, 0o600)
+    return os.open(str(path), flags, 0o600)
+
+
+def ssh_path(path):
+    # Windows OpenSSH accepts forward slashes; literal % must not expand as a
+    # host/session token in a user-selected directory or identity filename.
+    value = str(path)
+    if sys.platform == 'win32':
+        value = value.replace('\\', '/').replace('%', '%%')
+    return quote(value)
+
+
+def stop_process_group(proc, force=False):
+    if sys.platform == 'win32':
+        (proc.kill_group if force else proc.terminate_group)()
+    else:
+        os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
 
 
 def kernel_file_limit():
@@ -50,6 +119,9 @@ def kernel_file_limit():
 
 def raise_file_limit(target=8192, kernel_ceiling=None):
     """Raise only this process's soft limit; children inherit it unchanged."""
+    if sys.platform == 'win32':
+        # Windows socket/handle accounting has no POSIX RLIMIT_NOFILE.
+        return {'soft': None, 'hard': None, 'warning': ''}
     try:
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     except (OSError, ValueError) as error:
@@ -72,14 +144,27 @@ def now():
 
 def atomic_json(path, value):
     path = Path(path)
+    if sys.platform == 'win32':
+        windows_support().atomic_json(path, value)
+        return
     tmp = path.with_name(path.name + '.tmp')
-    fd = os.open(str(tmp), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-    with os.fdopen(fd, 'w') as f:
+    fd = private_open(tmp, os.O_CREAT | os.O_TRUNC | os.O_WRONLY)
+    with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(value, f, ensure_ascii=False, indent=2)
         f.flush()
         os.fsync(f.fileno())
     os.replace(str(tmp), str(path))
     path.chmod(0o600)
+
+
+def write_private_text(path, text):
+    """Write Windows configuration through a validated private temporary file."""
+    path = Path(path)
+    if sys.platform != 'win32':
+        path.write_text(text, encoding='utf-8')
+        path.chmod(0o600)
+        return
+    windows_support().atomic_write(path, text)
 
 
 def host_ok(value):
@@ -145,7 +230,9 @@ class Child:
         self.server_id = server_id
         self.recovery_until = 0
         self.is_gost = (server_id is None and bool(argv) and getattr(manager, 'app', None) is not None
-                        and argv[0] == str(manager.app / 'bin/gost'))
+                        and argv[0] == str(gost_executable(manager.app)))
+        self.is_native_proxy = (server_id is None and getattr(manager, 'app', None) is not None
+                                and argv[:4] == [sys.executable, '-B', str(manager.app / 'windows_proxy.py'), '--config'])
 
     def spawn(self):
         with self.manager.lock:
@@ -162,9 +249,16 @@ class Child:
                 env = child_environment(env, self.manager.data)
             if self.server_id:
                 env['PM_SERVER_ID'] = self.server_id
-            self.proc = subprocess.Popen(self.argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                         stderr=subprocess.STDOUT, start_new_session=True,
-                                         env=env, close_fds=True)
+            if sys.platform == 'win32':
+                # Native creation assigns the suspended child to its owned job
+                # before any SSH/proxy/helper instruction can spawn descendants.
+                self.proc = windows_support().spawn_owned(
+                    self.argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, env=env, close_fds=True)
+            else:
+                self.proc = subprocess.Popen(self.argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT, start_new_session=True,
+                                             env=env, close_fds=True)
         except OSError as e:
             self.error = 'Could not start component: ' + str(e)
             self.error_time = time.monotonic()
@@ -190,7 +284,7 @@ class Child:
             if self.is_gost and self.manager.is_front_probe_eof(line):
                 continue
             request_error = False
-            if self.is_gost:
+            if self.is_gost or self.is_native_proxy:
                 try:
                     details = json.loads(line)
                     if isinstance(details, dict) and isinstance(details.get('msg'), str):
@@ -204,7 +298,7 @@ class Child:
                 except (ValueError, TypeError):
                     pass
             line = line[:800]
-            # OpenSSH and GOST never receive a password through argv/config here.
+            # OpenSSH and proxy frontends receive no password through argv/config.
             with self.manager.lock:
                 if generation != self.generation:
                     continue
@@ -226,6 +320,8 @@ class Child:
         t = time.monotonic()
         if self.proc and self.proc.poll() is not None:
             code = self.proc.returncode
+            if sys.platform == 'win32':
+                self.proc.close()  # Retire hop descendants even if their SSH parent exited.
             (self.manager.data / 'runtime' / ('child-%s.json' % self.proc.pid)).unlink(missing_ok=True)
             self.proc = None
             self.ready = False
@@ -250,14 +346,14 @@ class Child:
         self.ready = False
         if p and p.poll() is None:
             try:
-                os.killpg(p.pid, signal.SIGTERM)
+                stop_process_group(p)
             except ProcessLookupError:
                 pass
             try:
                 p.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 try:
-                    os.killpg(p.pid, signal.SIGKILL)
+                    stop_process_group(p, force=True)
                 except ProcessLookupError:
                     pass
                 p.wait(timeout=2)
@@ -265,6 +361,8 @@ class Child:
 
     def _finish_stop(self, p):
         # Preserve ownership if terminating/waiting raised an error.
+        if p and sys.platform == 'win32':
+            p.close()
         self.generation += 1
         self.proc = None
         if p:
@@ -280,7 +378,7 @@ class Child:
             try:
                 if proc and proc.poll() is None:
                     try:
-                        os.killpg(proc.pid, signal.SIGTERM)
+                        stop_process_group(proc)
                     except ProcessLookupError:
                         pass
                 pending.append((child, proc))
@@ -302,7 +400,7 @@ class Child:
         for child, proc in survivors:
             try:
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
+                    stop_process_group(proc, force=True)
                 except ProcessLookupError:
                     pass
                 killed.append((child, proc))
@@ -322,26 +420,32 @@ class Manager:
     def __init__(self, data_dir, app_dir, port, service_streams=()):
         # Do this before spawning managed children or reader/monitor threads.
         self.fd_limits = raise_file_limit(kernel_ceiling=kernel_file_limit())
+        if sys.platform == 'win32':
+            windows_support().ensure_private_directory(Path(data_dir))
         self.data = Path(data_dir).resolve()
         self.app = Path(app_dir).resolve()
         self.port = port
         self.started_at = now()
         self.lock = threading.RLock()
-        self.data.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self.data.chmod(0o700)
-        self.service_lock = os.open(str(self.data / '.service.lock'), os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            fcntl.flock(self.service_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            os.close(self.service_lock)
-            raise RuntimeError('Another service instance is already using this configuration.')
-        (self.data / 'runtime').mkdir(mode=0o700, exist_ok=True)
+        if sys.platform == 'win32':
+            self.service_lock = windows_support().ServiceLock(self.data / '.service.lock')
+            windows_support().ensure_private_directory(self.data / 'runtime')
+        else:
+            self.data.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self.data.chmod(0o700)
+            self.service_lock = os.open(str(self.data / '.service.lock'), os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                fcntl.flock(self.service_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(self.service_lock)
+                raise RuntimeError('Another service instance is already using this configuration.')
+            (self.data / 'runtime').mkdir(mode=0o700, exist_ok=True)
         self.reap_owned_children()
         self.config_path = self.data / 'config.json'
-        self.config = json.loads(self.config_path.read_text()) if self.config_path.exists() else {
+        self.config = json.loads(read_private_text(self.config_path)) if self.config_path.exists() else {
             'servers': [], 'tunnels': [], 'migration': {'phase': 'testing', 'message': 'Testing on separate local ports.'}}
         control = self.data / 'control.json'
-        self.token = json.loads(control.read_text())['token'] if control.exists() else secrets.token_urlsafe(48)
+        self.token = json.loads(read_private_text(control))['token'] if control.exists() else secrets.token_urlsafe(48)
         atomic_json(control, {'port': port, 'token': self.token})
         self.cookies = {}
         self.logs = EventLog()
@@ -357,7 +461,12 @@ class Manager:
         self.wake_recovery = None
         self.child_env = dict(os.environ)
         self.child_env['LC_ALL'] = 'C'
-        self.child_env['SSH_ASKPASS'] = str(self.app / 'askpass.py')
+        if sys.platform == 'win32':
+            self.child_env['SSH_ASKPASS'] = str(self.app / 'bin/HopHarborHelper.exe')
+            self.child_env['HOPHARBOR_APP'] = str(self.app)
+            self.child_env['PATH'] = str(self.app / 'bin') + os.pathsep + self.child_env.get('PATH', '')
+        else:
+            self.child_env['SSH_ASKPASS'] = str(self.app / 'askpass.py')
         self.child_env['SSH_ASKPASS_REQUIRE'] = 'force'
         self.child_env['DISPLAY'] = 'HopHarbor'
         self.child_env['PM_DATA_DIR'] = str(self.data)
@@ -375,9 +484,19 @@ class Manager:
         threading.Thread(target=self.watch, daemon=True).start()
 
     def reap_owned_children(self):
+        if sys.platform == 'win32':
+            # Exclusive ServiceLock plus kill-on-close job ownership replaces
+            # PID probing. Never terminate a potentially reused arbitrary PID.
+            for path in (self.data / 'runtime').glob('child-*.json'):
+                try:
+                    windows_support().validate_private_file(path)
+                    path.unlink()
+                except (OSError, ValueError):
+                    pass
+            return
         for f in (self.data / 'runtime').glob('child-*.json'):
             try:
-                obj = json.loads(f.read_text())
+                obj = json.loads(read_private_text(f))
                 pid = int(obj['pid'])
                 cmd = subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'command='],
                                      capture_output=True, text=True, timeout=3).stdout
@@ -406,7 +525,10 @@ class Manager:
             try:
                 if not path.is_file() or path.stat().st_size > 65536:
                     continue
-                config = json.loads(path.read_text())
+                config = json.loads(read_private_text(path))
+                if sys.platform == 'win32' and is_windows_proxy_descriptor(config, ident):
+                    path.unlink(missing_ok=True)
+                    continue
                 services = config.get('services') if isinstance(config, dict) else None
                 if (isinstance(services, list) and len(services) == 1
                         and isinstance(services[0], dict) and services[0].get('name') == ident
@@ -453,6 +575,21 @@ class Manager:
         atomic_json(self.config_path, self.config)
 
     def keychain(self, action, payload):
+        if sys.platform == 'win32':
+            helper = self.app / 'bin/HopHarborHelper.exe'
+            if not helper.is_file():
+                if action == 'has':
+                    return {'has_password': False, 'has_key_passphrase': False}
+                raise ValueError('The Windows Credential Manager component is unavailable. Install or update the app.')
+            q = subprocess.run([str(helper), action], input=json.dumps(payload), text=True,
+                               encoding='utf-8', capture_output=True, timeout=15,
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000))
+            if q.returncode:
+                raise ValueError('Could not access Windows Credential Manager for this signed-in user.')
+            result = json.loads(q.stdout)
+            if not isinstance(result, dict) or result.get('ok') is False:
+                raise ValueError('Could not access Windows Credential Manager for this signed-in user.')
+            return result
         if sys.platform.startswith('linux'):
             helper = self.app / 'credentials.py'
             if not helper.is_file():
@@ -503,7 +640,11 @@ class Manager:
             identity = s.get('identity_file') or ''
             if identity:
                 p = Path(os.path.expanduser(identity))
-                if not p.is_absolute() or not p.is_file() or p.stat().st_uid != os.getuid():
+                if not p.is_absolute() or not p.is_file():
+                    raise ValueError('The identity file must exist and belong to the current user.')
+                if sys.platform == 'win32':
+                    windows_support().validate_identity_file(p)
+                elif p.stat().st_uid != os.getuid():
                     raise ValueError('The identity file must exist and belong to the current user.')
                 quote(str(p))
                 s['identity_file'] = str(p)
@@ -541,10 +682,16 @@ class Manager:
     def write_ssh_config(self):
         known = self.data / 'known_hosts'
         if not known.exists():
-            known.touch(mode=0o600)
+            if sys.platform == 'win32':
+                os.close(private_open(known, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            else:
+                known.touch(mode=0o600)
+        elif sys.platform == 'win32':
+            windows_support().validate_private_file(known)
         lines = ['Host *', '  BatchMode no', '  NumberOfPasswordPrompts 1', '  StrictHostKeyChecking yes',
-                 '  UpdateHostKeys no', '  UserKnownHostsFile ' + quote(str(known)),
-                 '  GlobalKnownHostsFile /dev/null', '  ControlMaster no', '  ControlPath none',
+                 '  UpdateHostKeys no', '  UserKnownHostsFile ' + ssh_path(known),
+                 '  GlobalKnownHostsFile ' + ('NUL' if sys.platform == 'win32' else '/dev/null'),
+                 '  ControlMaster no', '  ControlPath none',
                  '  ConnectTimeout 12', '  ConnectionAttempts 1',
                  '  TCPKeepAlive yes', '  ExitOnForwardFailure yes',
                  '  RequestTTY no', '  Compression no', '  ForwardAgent no',
@@ -559,20 +706,22 @@ class Manager:
                       '  ServerAliveInterval ' + str(s.get('keepalive_interval', 30)),
                       '  ServerAliveCountMax ' + str(s.get('keepalive_count', 3))]
             if s.get('identity_file'):
-                lines += ['  IdentityFile ' + quote(s['identity_file']), '  IdentitiesOnly yes']
+                lines += ['  IdentityFile ' + ssh_path(s['identity_file']), '  IdentitiesOnly yes']
             mode = s.get('auth_mode', 'agent')
             lines += ['  PubkeyAuthentication ' + ('no' if mode == 'password' else 'yes'),
                       '  PasswordAuthentication ' + ('yes' if mode in ('password', 'key_password') else 'no'),
                       '  KbdInteractiveAuthentication ' + ('yes' if mode in ('password', 'key_password') else 'no')]
             if s.get('jump_id'):
-                command = '/usr/bin/python3 ' + quote(str(self.app / 'ssh_hop.py'))
-                command += ' --data-dir ' + quote(str(self.data)) + ' --app-dir ' + quote(str(self.app))
+                if sys.platform == 'win32':
+                    command = 'HopHarborHelper.exe hop'
+                else:
+                    command = '/usr/bin/python3 ' + quote(str(self.app / 'ssh_hop.py'))
+                    command += ' --data-dir ' + quote(str(self.data)) + ' --app-dir ' + quote(str(self.app))
                 command += ' --server ' + s['jump_id'] + ' --host %h --port %p'
                 lines += ['  ProxyCommand ' + command]
             lines.append('')
         p = self.data / 'ssh_config'
-        p.write_text('\n'.join(lines))
-        p.chmod(0o600)
+        write_private_text(p, '\n'.join(lines))
 
     def tunnel(self, tunnel_id):
         for t in self.config['tunnels']:
@@ -615,7 +764,7 @@ class Manager:
                 ports.append(p)
             children = []
             for i, p in enumerate(ports):
-                args = ['/usr/bin/ssh', '-F', str(self.data / 'ssh_config'), '-N', '-n']
+                args = [system_executable('ssh'), '-F', str(self.data / 'ssh_config'), '-N', '-n']
                 if t['kind'] == 'local':
                     target = t['remote_host']
                     if ':' in target:
@@ -626,8 +775,13 @@ class Manager:
                 args += ['pm_' + t['server_id']]
                 children.append(Child(args, t['name'] + ' / SSH ' + str(i + 1), self, tunnel_id, t['server_id']))
             cfgpath = self.data / 'runtime' / (tunnel_id + '.json')
-            atomic_json(cfgpath, self.gost_config(t, ports))
-            gost = Child([str(self.app / 'bin/gost'), '-C', str(cfgpath)], t['name'] + ' / Proxy', self, tunnel_id)
+            if sys.platform == 'win32':
+                atomic_json(cfgpath, windows_proxy_descriptor(t, ports))
+                frontend_argv = [sys.executable, '-B', str(self.app / 'windows_proxy.py'), '--config', str(cfgpath)]
+            else:
+                atomic_json(cfgpath, self.gost_config(t, ports))
+                frontend_argv = [str(gost_executable(self.app)), '-C', str(cfgpath)]
+            gost = Child(frontend_argv, t['name'] + ' / Proxy', self, tunnel_id)
             self.runtime[tunnel_id] = {'ports': ports, 'ssh': children, 'gost': gost,
                                        'status': 'starting', 'healthy': 0, 'last_test': None}
             for c in children:
@@ -841,8 +995,8 @@ class Manager:
             result = {'ok': self.front_probe(t['local_port']), 'message': 'TCP listener test only; internet access was not checked.', 'time': now()}
         else:
             proxy = ('socks5h' if kind == 'socks' else 'http') + '://127.0.0.1:' + str(t['local_port'])
-            args = ['/usr/bin/curl', '--proxy', proxy, '--noproxy', '', '--connect-timeout', '6', '--max-time', '12',
-                    '--silent', '--show-error', '--output', '/dev/null', '--write-out', '%{http_code} %{time_total}',
+            args = [system_executable('curl'), '--proxy', proxy, '--noproxy', '', '--connect-timeout', '6', '--max-time', '12',
+                    '--silent', '--show-error', '--output', os.devnull, '--write-out', '%{http_code} %{time_total}',
                     'https://example.com/']
             q = subprocess.run(args, capture_output=True, text=True, timeout=15)
             ok = q.returncode == 0 and q.stdout.startswith('200 ')
@@ -870,7 +1024,7 @@ class Manager:
                            connections=None, pid=r['gost'].proc.pid if r and r['gost'].proc else None,
                            last_error=latest_error, last_test=r['last_test'] if r else None)
                 tunnels.append(row)
-            known = (self.data / 'known_hosts').read_text().splitlines()
+            known = read_private_text(self.data / 'known_hosts').splitlines()
             servers = []
             for server in self.config['servers']:
                 row = dict(server)
@@ -884,7 +1038,8 @@ class Manager:
                                 'build': MAC_BUILD if sys.platform == 'darwin' else BUILD,
                                 'port': self.port, 'started_at': self.started_at,
                                 'platform': 'linux' if sys.platform.startswith('linux') else sys.platform,
-                                'credential_store': 'GNOME Keyring' if sys.platform.startswith('linux') else 'Keychain',
+                                'credential_store': ('Windows Credential Manager' if sys.platform == 'win32'
+                                                     else 'GNOME Keyring' if sys.platform.startswith('linux') else 'Keychain'),
                                 'fd_soft_limit': self.fd_limits['soft'], 'fd_hard_limit': self.fd_limits['hard'],
                                 'fd_limit_warning': self.fd_limits['warning'],
                                 'log_policy': {'retention': 'local-day', 'max_events': 200,
@@ -930,6 +1085,13 @@ class Manager:
                     if value is not None and (not isinstance(value, str) or len(value) > 8192):
                         raise ValueError('Invalid authentication credentials.')
                     if value:
+                        if sys.platform == 'win32':
+                            try:
+                                encoded = value.encode('utf-8')
+                            except UnicodeError:
+                                raise ValueError('Invalid authentication credentials.')
+                            if len(encoded) > 1022 or any(c in value for c in ('\0', '\r', '\n')):
+                                raise ValueError('Windows passwords and key passphrases must fit within 1022 UTF-8 bytes and contain no line breaks.')
                         credentials[field] = value
             pin = None
             if collection == 'servers' and not delete and data.get('host_key'):
@@ -952,7 +1114,8 @@ class Manager:
                 self.keychain('delete', {'server_id': ident})
             self.config = current
             if pin:
-                with (self.data / 'known_hosts').open('a') as f:
+                fd = private_open(self.data / 'known_hosts', os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+                with os.fdopen(fd, 'a', encoding='utf-8', newline='\n') as f:
                     f.write(pin)
             self.save()
             self.write_ssh_config()
@@ -965,8 +1128,11 @@ class Manager:
         for tid in list(self.runtime):
             self.stop(tid)
         if self.service_lock is not None:
-            fcntl.flock(self.service_lock, fcntl.LOCK_UN)
-            os.close(self.service_lock)
+            if sys.platform == 'win32':
+                self.service_lock.close()
+            else:
+                fcntl.flock(self.service_lock, fcntl.LOCK_UN)
+                os.close(self.service_lock)
             self.service_lock = None
 
 
@@ -1026,6 +1192,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self.trusted_host():
             return self.reply(403, {'error': 'Request host is not allowed.'})
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/api/service/health' and sys.platform == 'win32':
+            return self.reply(200, {'ok': True, 'version': VERSION, 'build': BUILD, 'platform': 'win32'}) \
+                if self.auth() else self.reply(401, {'error': 'Panel authentication is required. Reopen the app.'})
         if path == '/api/state':
             return self.reply(200, self.manager.state()) if self.auth() else self.reply(401, {'error': 'Panel authentication is required. Reopen the app.'})
         if path.startswith('/api/'):
@@ -1055,6 +1224,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.reply(200, {'ok': True}, headers={'Set-Cookie': 'pm_session=' + session + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200'})
             if not self.auth():
                 return self.reply(401, {'error': 'Panel authentication is required.'})
+            if parts == ['api', 'service', 'stop'] and self.command == 'POST' and sys.platform == 'win32':
+                self.reply(200, {'ok': True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if len(parts) >= 2 and parts[0] == 'api' and parts[1] in ('servers', 'tunnels'):
                 collection = parts[1]
                 if len(parts) == 2 and self.command == 'POST':
@@ -1097,15 +1270,21 @@ def main():
     p.add_argument('--port', type=int, default=17777)
     a = p.parse_args()
     os.umask(0o077)
-    data_dir = Path(a.data_dir).expanduser().resolve()
-    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    data_dir.chmod(0o700)
+    data_dir = Path(a.data_dir).expanduser()
+    if sys.platform == 'win32':
+        windows_support().ensure_private_directory(data_dir)
+        data_dir = data_dir.resolve()
+    else:
+        data_dir = data_dir.resolve()
+        data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        data_dir.chmod(0o700)
     streams = install_service_streams(data_dir / 'logs')
     sys.stdout, sys.stderr = streams
     httpd = http.server.ThreadingHTTPServer(('127.0.0.1', a.port), Handler)
     httpd.daemon_threads = True
     try:
-        manager = Manager(a.data_dir, a.app_dir, a.port, service_streams=streams)
+        port = httpd.server_address[1] if sys.platform == 'win32' else a.port
+        manager = Manager(a.data_dir, a.app_dir, port, service_streams=streams)
     except Exception:
         httpd.server_close()
         raise

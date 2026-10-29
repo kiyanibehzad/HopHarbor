@@ -15,6 +15,7 @@ private final class PanelAuthSmokeDriver {
     let reportURL: URL
     let session = URLSession(configuration: .ephemeral)
     var checks: [String] = []
+    var frameChecks: [[String: Any]] = []
     var exitCode: Int32 = 1
 
     init(delegate: AppDelegate, fixture: URL, reportURL: URL) {
@@ -92,7 +93,7 @@ private final class PanelAuthSmokeDriver {
     }
 
     func save(ok: Bool, error: String? = nil) throws {
-        var report: [String: Any] = ["ok": ok, "checks": checks,
+        var report: [String: Any] = ["ok": ok, "checks": checks, "frame_checks": frameChecks,
             "actual_wkwebview": true, "actual_app_delegate": true,
             "synthetic_loopback_only": true, "real_ssh_started": false,
             "actual_system_sleep": false, "forced_renderer_crash": false]
@@ -108,6 +109,22 @@ private final class PanelAuthSmokeDriver {
         fflush(stdout)
     }
 
+    func requireChildNeverExecuted(_ name: String, generation: Int, browser: WKWebView) async throws {
+        let stats = try await fixtureCall("stats")
+        guard let requests = stats["frame_requests"] as? [String: Int] else {
+            throw SmokeFailure(message: "The fixture did not report child request counts.")
+        }
+        let noScript = try await evaluate(
+            "!document.documentElement.dataset.fixtureFrameAttempted&&!document.documentElement.dataset.fixtureFrameDone") as? Bool == true
+        try require(requests[name, default: 0] == 0 && noScript,
+                    "A child document was fetched or executed: " + name)
+        try require(delegate.testingGeneration == generation && delegate.testingBrowser === browser
+                    && !delegate.testingRecoveryScheduled && !delegate.testingNeedsReauthentication,
+                    "A child or popup caused panel authentication recovery: " + name)
+        frameChecks.append(["case": name, "child_requests": requests[name, default: 0],
+            "child_script_executed": !noScript, "panel_generation_changed": false])
+    }
+
     func run() async {
         do {
             delegate.testingNameWindow()
@@ -115,15 +132,30 @@ private final class PanelAuthSmokeDriver {
             try passed("Actual AppDelegate and WKWebView bootstrap authenticate and remove the token fragment")
 
             let start = delegate.testingGeneration
-            _ = try await evaluate("(()=>{const f=document.createElement('iframe');f.id='fixture-frame';f.hidden=true;f.src=location.origin+'/?fixture=frame';document.body.append(f);return true})()")
-            try await wait("actual subframe bridge attempt") {
-                try await self.evaluate("document.documentElement.dataset.fixtureFrameDone==='true'") as? Bool == true
+            for name in ["direct", "parent-native", "parent-wrapper"] {
+                guard let browser = delegate.testingBrowser else { throw SmokeFailure(message: "Current WebView missing.") }
+                let blocked = delegate.testingBlockedFrameNavigations
+                _ = try await evaluate("(()=>{const f=document.createElement('iframe');f.id='fixture-frame';f.hidden=true;f.src=location.origin+'/?fixture=frame&case=" + name + "';document.body.append(f);return true})()")
+                try await wait("native child navigation cancellation: " + name) {
+                    self.delegate.testingBlockedFrameNavigations > blocked
+                }
+                try await pause(0.2)
+                try await requireChildNeverExecuted(name, generation: start, browser: browser)
+                _ = try await evaluate("(document.getElementById('fixture-frame').remove(),true)")
+                try passed("Native navigation prevents child execution before its " + name + " bridge call")
             }
+
+            guard let popupBrowser = delegate.testingBrowser else { throw SmokeFailure(message: "Current WebView missing.") }
+            _ = try await evaluate("(window.open(location.origin+'/?fixture=frame&case=popup','_blank'),true)")
+            try await pause(0.5)
+            try await requireChildNeverExecuted("popup", generation: start, browser: popupBrowser)
+            try passed("A popup cannot open a child document or initiate panel recovery")
+
             _ = try await evaluate("(()=>{window.webkit.messageHandlers.hopharborPanel.postMessage({action:'reauthenticate',reason:'unknown'});window.webkit.messageHandlers.hopharborPanel.postMessage({action:'reauthenticate',reason:'authentication',destination:'http://attacker.invalid/'});return true})()")
             try await pause(0.5)
             try require(delegate.testingGeneration == start && !delegate.testingRecoveryScheduled,
-                        "A subframe or malformed recovery message was accepted.")
-            try passed("Real subframe and malformed bridge messages cannot schedule recovery")
+                        "A malformed recovery message was accepted.")
+            try passed("Malformed main-frame bridge messages cannot schedule recovery")
 
             guard let racingBrowser = delegate.testingBrowser else { throw SmokeFailure(message: "Current WebView missing.") }
             delegate.testingPrimeRecoveryCooldown()
@@ -195,14 +227,19 @@ private final class PanelAuthSmokeDriver {
             try passed("Perpetual state 401s stop after three automatic attempts; explicit Retry recovers after correction")
 
             guard let renderer = delegate.testingBrowser else { throw SmokeFailure(message: "Current WebView missing.") }
+            guard let staleNavigation = delegate.testingMainFrameNavigation else {
+                throw SmokeFailure(message: "A real main-frame navigation was not observed.")
+            }
             let rendererGeneration = delegate.testingGeneration
             delegate.webViewWebContentProcessDidTerminate(renderer)
             try await waitOnline(after: rendererGeneration)
             let current = delegate.testingBrowser
             delegate.webViewWebContentProcessDidTerminate(renderer)
             delegate.webView(renderer, didFail: nil, withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost))
+            var stalePolicy: WKNavigationActionPolicy?
+            delegate.webView(renderer, decidePolicyFor: staleNavigation) { stalePolicy = $0 }
             try await pause(0.2)
-            try require(delegate.testingBrowser === current && !delegate.testingRecoveryScheduled,
+            try require(stalePolicy == .cancel && delegate.testingBrowser === current && !delegate.testingRecoveryScheduled,
                         "A stale renderer callback replaced the current panel.")
             try passed("Controlled renderer-termination callback rebuilds the panel and stale renderer/navigation callbacks are ignored")
 

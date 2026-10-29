@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var recoveryWork: DispatchWorkItem?
     private var pageGeneration = 0
     private var needsReauthentication = false
+#if HOPHARBOR_PANEL_TESTING
+    private var blockedFrameNavigations = 0
+    private var lastMainFrameNavigation: WKNavigationAction?
+#endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -375,6 +379,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard webView === self.webView else {
+            decisionHandler(.cancel)
+            return
+        }
+        // A same-origin child can call its parent's bridge and appear to be the
+        // main frame. The panel needs no child documents or popup windows: stop
+        // their navigation before a child script can reach the parent bridge.
+        guard navigationAction.targetFrame?.isMainFrame == true else {
+#if HOPHARBOR_PANEL_TESTING
+            blockedFrameNavigations += 1
+#endif
+            decisionHandler(.cancel)
+            return
+        }
         guard let url = navigationAction.request.url else {
             decisionHandler(.cancel)
             return
@@ -386,6 +404,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             return
         }
         let isLocal = url.scheme == "http" && url.host == "127.0.0.1" && url.port == activePort
+#if HOPHARBOR_PANEL_TESTING
+        if isLocal { lastMainFrameNavigation = navigationAction }
+#endif
         decisionHandler(isLocal ? .allow : .cancel)
     }
 
@@ -412,6 +433,8 @@ extension AppDelegate {
     var testingGeneration: Int { pageGeneration }
     var testingRecoveryScheduled: Bool { recoveryWork != nil }
     var testingNeedsReauthentication: Bool { needsReauthentication }
+    var testingBlockedFrameNavigations: Int { blockedFrameNavigations }
+    var testingMainFrameNavigation: WKNavigationAction? { lastMainFrameNavigation }
     func testingReload() { reloadPanel(nil) }
     func testingHide() { keepInMenuBar(nil) }
     func testingShow() { showPanel(nil) }

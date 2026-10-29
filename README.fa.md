@@ -1,29 +1,29 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو**، با پنل گرافیکی و سرویس پس‌زمینه.
+مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
 
 [English guide](README.md) · [دانلود و انتشارها](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
 ## سیستم‌های پشتیبانی‌شده
 
-| سیستم‌عامل | سخت‌افزار | نسخهٔ فعلی برنامه | روش نصب |
+**HopHarbor 1.3.2 · بیلد 12** برای مک، اوبونتو و نسخهٔ آزمایشی ویندوز از یک سورس و تگ انتشار مشترک استفاده می‌کند. [توضیحات انتشار و اعتبارسنجی](docs/release-1.3.2.md).
+
+| سیستم‌عامل | سخت‌افزار | آخرین نسخهٔ منتشرشده | روش نصب |
 | --- | --- | --- | --- |
-| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.3.1 · بیلد 11 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.2.1 · بیلد 9 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.3.2 · بیلد 12 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.3.2 · بیلد 12 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
-**ساخت‌های جدید از سورس، نسخه و شمارهٔ بیلد مشترک دارند: 1.3.1 · بیلد 11.** بسته‌های موجود اوبونتو و نسخهٔ آزمایشی ویندوز در ادامه شمارهٔ انتشار فعلی‌شان را حفظ می‌کنند؛ به‌روزرسانی بعدی که برای آن‌ها ساخته شود از نسخهٔ مشترک استفاده می‌کند. تگ‌ها و فایل‌های منتشرشدهٔ قبلی حفظ می‌شوند.
+پنل‌های بومی پس از انقضای کوکی، ورود محلی را بدون راه‌اندازی دوبارهٔ اتصال‌های پس‌زمینه بازیابی می‌کنند. حفاظت بومی فریم، دسترسی فریم فرزند به بازیابی را محدود می‌کند. انتشارهای قبلی حفظ شده‌اند. وضعیت آزمون‌های [مک](docs/macos-panel-recovery.md)، [اوبونتو](docs/ubuntu-panel-recovery.md) و [ویندوز](docs/windows-panel-recovery.md) مشخص است.
 
-این به‌روزرسانی پنل مک، ورود محلی پنل را پس از ازدست‌رفتن دسترسی بازیابی می‌کند و برای بارگذاری ناقص صفحه مسیر بازیابی دارد. بارگذاری دوبارهٔ پنل، اتصال‌های SSH پس‌زمینه را متوقف نمی‌کند. [توضیح بازیابی و وضعیت آزمون‌ها](docs/macos-panel-recovery.md) در دسترس است.
+## نسخهٔ آزمایشی ویندوز — 1.3.2 · بیلد 12
 
-## نسخهٔ آزمایشی ویندوز — 1.3.0 · بیلد 10
+- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده — هنوز تست اجرایی نشده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
+- [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [راهنمای نصب و استفاده](packaging/windows/README.md).
 
-- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [دانلود نصب‌کننده — هنوز تست اجرایی نشده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-arm64-setup.exe).
-- [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.0-preview.1) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.0-preview.1/HopHarbor-1.3.0-windows-SHA256SUMS.txt) · [راهنمای نصب و استفاده](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/packaging/windows/README.md).
-
-نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد. تست اتصال‌ها، پنل و نصب و حذف روی Windows 10 Pro 22H2 x64 پاس شده‌اند؛ Windows 11، اجرای بومی ARM64 و خواب یا تغییر واقعی شبکه هنوز تأیید نشده‌اند. [جزئیات آزمون‌ها](https://github.com/kiyanibehzad/HopHarbor/blob/windows-preview/docs/windows-testing.md) مشخص است.
+نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد. تست اتصال‌ها، پنل و نصب و حذف روی Windows 10 Pro 22H2 x64 پاس شده‌اند؛ Windows 11، اجرای بومی ARM64 و خواب یا تغییر واقعی شبکه هنوز تأیید نشده‌اند. آزمون انتقال ۲ MiB با مهلت چهار ثانیه در این نسخه و پیش‌نمایش قبلی شکست می‌خورد؛ این محدودیت شناخته‌شدهٔ نسخهٔ آزمایشی ثبت شده است. [جزئیات آزمون‌ها](docs/windows-panel-recovery.md) مشخص است.
 
 ## نصب
 
@@ -31,21 +31,21 @@
 
 بستهٔ مناسب سخت‌افزار اوبونتو را دانلود و دستور همان معماری را در پوشهٔ دانلود اجرا کنید:
 
-**Intel / AMD — amd64:** [دانلود hopharbor_1.2.1_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_amd64.deb)
+**Intel / AMD — amd64:** [دانلود hopharbor_1.3.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.2.1_amd64.deb
+sudo apt install ./hopharbor_1.3.2_amd64.deb
 ```
 
-**ARM64 — arm64:** [دانلود hopharbor_1.2.1_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/hopharbor_1.2.1_arm64.deb)
+**ARM64 — arm64:** [دانلود hopharbor_1.3.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.2.1_arm64.deb
+sudo apt install ./hopharbor_1.3.2_arm64.deb
 ```
 
 سپس **HopHarbor** را از فهرست برنامه‌ها باز کنید و Sessionها و پورت‌فورواردهای خودتان را بسازید. بسته شامل GOST تأییدشده است و APT کتابخانه‌های موردنیاز دسکتاپ را نصب می‌کند.
 
-[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.2.1/HopHarbor-Ubuntu-1.2.1-SHA256SUMS.txt)
+[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt)
 
 ### نصب روی مک
 
@@ -54,7 +54,7 @@ sudo apt install ./hopharbor_1.2.1_arm64.deb
 پس از بررسی سورس اجرا کنید:
 
 ```sh
-git clone https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.3.2 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -66,7 +66,7 @@ open "$HOME/Applications/HopHarbor.app"
 
 ## اجرای پس‌زمینه و اجزای برنامه
 
-موتور SSH همان OpenSSH سیستم‌عامل است. مک از launchd و Keychain و اوبونتو از systemd و GNOME Keyring استفاده می‌کند. GOST جزء اضافه‌ای برای پراکسی HTTP و توزیع اتصال‌هاست و جزو ابزارهای داخلی سیستم‌عامل نیست. بستن پنجره، سرویس اتصال‌ها را قطع نمی‌کند. سورس و بسته‌های عمومی شامل تنظیمات، رمزها یا کلیدهای شخصی نیستند.
+موتور SSH همان OpenSSH سیستم‌عامل است. مک از launchd و Keychain و اوبونتو از systemd و GNOME Keyring استفاده می‌کند. GOST جزء اضافه‌ای برای پراکسی HTTP و توزیع اتصال‌هاست و جزو ابزارهای داخلی سیستم‌عامل نیست. نسخهٔ آزمایشی ویندوز از OpenSSH سیستم، Windows Credential Manager، پنل WebView2 و پراکسی داخلی پروژه استفاده می‌کند و فایل اجرایی GOST ندارد. بستن پنجره، سرویس اتصال‌ها را قطع نمی‌کند. سورس و بسته‌های عمومی شامل تنظیمات، رمزها یا کلیدهای شخصی نیستند.
 
 ## اصطلاح‌های پنل
 
