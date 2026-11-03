@@ -2,21 +2,23 @@
 const $=id=>document.getElementById(id);
 const num=n=>new Intl.NumberFormat('en-US').format(Number(n)||0);
 
-// Only appearance and setup-note dismissal are browser-stored preferences; credentials never enter browser storage.
+// Appearance, setup dismissal and the last seen release are browser preferences; credentials never enter browser storage.
 const APPEARANCE_KEY='hopharbor.appearance';
 const systemAppearance=window.matchMedia('(prefers-color-scheme: dark)');
 let appearanceChoice=['system','light','dark'].includes(document.documentElement.dataset.appearance)?document.documentElement.dataset.appearance:'system';
 function applyAppearance(){
   document.documentElement.dataset.appearance=appearanceChoice;
   document.documentElement.dataset.theme=appearanceChoice==='system'?((typeof window.HopHarborSystemDark==='boolean'?window.HopHarborSystemDark:systemAppearance.matches)?'dark':'light'):appearanceChoice;
-  $('appearanceSelect').value=appearanceChoice;
+  const modes=['system','light','dark'],names=['System','Light','Dark'],i=modes.indexOf(appearanceChoice);
+  const button=$('appearanceSelect');button.value=appearanceChoice;button.replaceChildren(icon(['appearance','sun','moon'][i]));
+  button.title=`Appearance: ${names[i]}. Switch to ${names[(i+1)%3]}`;button.setAttribute('aria-label',button.title);
 }
 function changeAppearance(choice){
   appearanceChoice=['system','light','dark'].includes(choice)?choice:'system';
   try{if(appearanceChoice==='system')localStorage.removeItem(APPEARANCE_KEY);else localStorage.setItem(APPEARANCE_KEY,appearanceChoice)}catch{}
   applyAppearance();
 }
-$('appearanceSelect').addEventListener('change',event=>changeAppearance(event.target.value));
+$('appearanceSelect').addEventListener('click',event=>{event.currentTarget.focus({preventScroll:true});const modes=['system','light','dark'];changeAppearance(modes[(modes.indexOf(appearanceChoice)+1)%3])});
 window.addEventListener('hopharbor-system-appearance',()=>{if(appearanceChoice==='system')applyAppearance()});
 if(systemAppearance.addEventListener)systemAppearance.addEventListener('change',()=>{if(appearanceChoice==='system')applyAppearance()});
 else systemAppearance.addListener(()=>{if(appearanceChoice==='system')applyAppearance()});
@@ -65,8 +67,8 @@ function postNativePanelMessage(message){
 function requestNativeRecovery(reason){if(reason==='authentication'){if(nativeRecoveryRequested)return false;nativeRecoveryRequested=true}return postNativePanelMessage({action:'reauthenticate',reason})}
 function retryLockedPanel(){if(requestNativeRecovery('retry'))return;authorized=true;$('lockedScreen').hidden=true;refresh(true)}
 function showLocked(copy){authorized=false;$('lockedScreen').hidden=false;if(copy)$('lockedCopy').textContent=copy;setService(false,'Panel access is not authorized.')}
-async function request(path,options={}){const headers={'Accept':'application/json','X-Requested-With':'ProxyManager',...(options.headers||{})};const opts={credentials:'same-origin',cache:'no-store',...options,headers};if(opts.method&&!['GET','HEAD'].includes(opts.method.toUpperCase())&&opts.body===undefined)opts.body={};if(opts.body!==undefined&&typeof opts.body!=='string'){headers['Content-Type']='application/json';opts.body=JSON.stringify(opts.body)}const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),path.endsWith('/test')?20000:12000);opts.signal=controller.signal;let response;try{response=await fetch(path,opts)}catch(err){if(err.name==='AbortError')throw new Error('The local service took too long to respond. Refresh its status.');throw new Error(`The local service is unavailable. Open HopHarbor on ${deviceName()}.`)}finally{clearTimeout(timer)}const text=await response.text();let data={};if(text){try{data=JSON.parse(text)}catch{if(response.ok)throw new Error('The local service returned an unreadable response.');data={}}}if(!response.ok){if(response.status===401||response.status===403){showLocked(data.error||`Open this panel from HopHarbor on ${deviceName()}.`);if(response.status===401&&path!=='/api/session')requestNativeRecovery('authentication')}throw new Error(typeof data.error==='string'?data.error:typeof data.error?.message==='string'?data.error.message:`The request failed (${response.status}).`)}return data}
-function setService(connected,message){$('serviceDot').classList.toggle('offline',!connected);$('footerDot').classList.toggle('offline',!connected);$('serviceLabel').textContent=connected?'Local service online':'Service unavailable';$('serviceBanner').hidden=connected||!authorized;if(!connected&&authorized)$('serviceBannerText').textContent=message||'Cannot reach the local service.'}
+async function request(path,options={}){const headers={'Accept':'application/json','X-Requested-With':'ProxyManager',...(options.headers||{})};const opts={credentials:'same-origin',cache:'no-store',...options,headers};if(opts.method&&!['GET','HEAD'].includes(opts.method.toUpperCase())&&opts.body===undefined)opts.body={};if(opts.body!==undefined&&typeof opts.body!=='string'){headers['Content-Type']='application/json';opts.body=JSON.stringify(opts.body)}const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),path.endsWith('/verify-endpoint')?24000:path.endsWith('/test')?20000:12000);opts.signal=controller.signal;let response;try{response=await fetch(path,opts)}catch(err){if(err.name==='AbortError')throw new Error('The local service took too long to respond. Refresh its status.');throw new Error(`The local service is unavailable. Open HopHarbor on ${deviceName()}.`)}finally{clearTimeout(timer)}const text=await response.text();let data={};if(text){try{data=JSON.parse(text)}catch{if(response.ok)throw new Error('The local service returned an unreadable response.');data={}}}if(!response.ok){if(response.status===401||response.status===403){showLocked(data.error||`Open this panel from HopHarbor on ${deviceName()}.`);if(response.status===401&&path!=='/api/session')requestNativeRecovery('authentication')}throw new Error(typeof data.error==='string'?data.error:typeof data.error?.message==='string'?data.error.message:`The request failed (${response.status}).`)}return data}
+function setService(connected,message){$('serviceDot').classList.toggle('offline',!connected);$('footerDot').classList.toggle('offline',!connected);$('serviceLabel').textContent=connected?'Online':'Offline';$('serviceLabel').title=connected?'Local service online':'Local service unavailable';renderUpdatesSummary();$('serviceBanner').hidden=connected||!authorized;if(!connected&&authorized)$('serviceBannerText').textContent=message||'Cannot reach the local service.'}
 async function refresh(force=false){if(!authorized)return;if(refreshInFlight&&!force)return;const sequence=++refreshSequence;refreshInFlight=true;$('refreshButton').disabled=true;try{const data=await request('/api/state');if(sequence!==refreshSequence)return;for(const key of ['servers','tunnels','logs'])state[key]=Array.isArray(data[key])?data[key]:[];state.service=data.service||{};state.migration=data.migration||{};loaded=true;lastSuccess=new Date();setService(true);render();if(!nativeReadySent&&postNativePanelMessage({action:'ready'}))nativeReadySent=true}catch(err){if(sequence===refreshSequence)setService(false,errorMessage(err))}finally{if(sequence===refreshSequence){refreshInFlight=false;$('refreshButton').disabled=false}}}
 function goView(view){if(!titles[view])return;currentView=view;for(const n of document.querySelectorAll('.view'))n.hidden=n.id!==`view-${view}`;for(const n of document.querySelectorAll('.nav-button')){const active=n.dataset.view===view;n.classList.toggle('active',active);if(active)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')}$('pageTitle').textContent=titles[view][0];$('pageSubtitle').textContent=titles[view][1];$('primaryActionText').textContent=view==='servers'?'New session':'New forwarding';$('primaryAction').hidden=view==='logs';if(loaded)render()}
 function emptyState(title,copy,action,label,symbol='tunnel'){const box=el('div','empty-state');children(box,children(el('div','empty-symbol'),icon(symbol)),el('h3','',title),el('p','',copy));if(action){const b=children(el('button','button soft'),icon('plus'),el('span','',label));b.type='button';b.addEventListener('click',action);box.append(b)}return box}
@@ -127,7 +129,7 @@ function renderTunnels(){
   const dashboard=[...state.tunnels].sort((a,b)=>Number(isRunning(b))-Number(isRunning(a))).slice(0,5);
   $('dashboardTunnels').replaceChildren(tunnelTable(dashboard,true));
 }
-function serverInUse(serverId,onlyRunning=false){return state.tunnels.some(t=>{if(onlyRunning&&!isRunning(t))return false;let current=serverById(t.server_id);const seen=new Set();while(current&&!seen.has(String(current.id))){if(String(current.id)===String(serverId))return true;seen.add(String(current.id));current=current.jump_id?serverById(current.jump_id):null}return false})}
+function serverInUse(serverId,onlyRunning=false){return state.servers.some(s=>{if(String(s.id)===String(serverId)&&s.desired_running)return true;if(onlyRunning&&!s.desired_running)return false;return (s.firewall_path||[]).some(id=>String(id)===String(serverId))})||state.tunnels.some(t=>{if(onlyRunning&&!isRunning(t))return false;let current=serverById(t.server_id);const seen=new Set();while(current&&!seen.has(String(current.id))){if(String(current.id)===String(serverId))return true;seen.add(String(current.id));current=current.jump_id?serverById(current.jump_id):null}return false})}
 function sessionMetrics(server){
   const own=state.tunnels.filter(t=>String(t.server_id)===String(server.id));
   const fallbackActive=own.filter(isRunning);
@@ -155,26 +157,27 @@ function renderServers(){
     const indicators=el('div','session-indicators');
     const normalized={connecting:'starting',disconnected:'stopped',in_use_as_firewall:'stopped'}[metrics.status]||metrics.status;
     indicators.append(statusBadge({status:normalized}));
-    if(metrics.firewall){const firewall=el('span','badge firewall-badge','Firewall in use');firewall.title=`Other active forwarding depends on this session${Number(s.dependent_forward_count)>0?` (${num(s.dependent_forward_count)})`:''}. Session controls leave those connections running.`;indicators.append(firewall)}
+    if(Number(s.dependent_session_count)>0)indicators.append(el('span','badge firewall-badge',`Firewall · ${num(s.dependent_session_count)} dependent session${s.dependent_session_count===1?'':'s'}`));
+    if(metrics.firewall){const firewall=el('span','badge firewall-badge','Firewall in use');firewall.title=`Other active SSH connections use this session${Number(s.dependent_forward_count)>0?` (${num(s.dependent_forward_count)})`:''}. Session controls leave those connections running.`;indicators.append(firewall)}
     const counts=el('div','session-counts');
     counts.append(el('div','',metrics.total?`${num(metrics.active)} / ${num(metrics.total)} forward${metrics.total===1?'':'s'} active`:'No forwarding configured'));
     if(metrics.active>0||metrics.sshActive>0)counts.append(el('div','',metrics.sshActive?`${num(metrics.sshHealthy)} / ${num(metrics.sshActive)} SSH sessions ready`:'0 SSH sessions ready'));
     children(statusbar,indicators,counts);card.append(statusbar);
+    if(s.last_error)card.append(el('div','error-inline',s.last_error));
     const details=el('div','server-card-details');
     const interval=Number(s.keepalive_interval??30),missed=Number(s.keepalive_count??3);
     const keepalive=interval?`${num(interval)} seconds · ${num(missed)} missed replies`:'Off';
-    for(const [label,value,mono]of [['Username',s.username||'—',true],['Firewall',s.jump_id?(serverById(s.jump_id)?.name||'Unknown session'):'None',false],['Authentication',authDescription(s),false],['Keepalive',keepalive,false]])details.append(children(el('div'),el('div','detail-label',label),el('div',`detail-value${mono?' mono':''}`,value)));
+    for(const [label,value,mono]of [['Username',s.username||'—',true],['Firewall route',firewallRoute(s),false],['Authentication',authDescription(s),false],['Keepalive',keepalive,false]])details.append(children(el('div'),el('div','detail-label',label),el('div',`detail-value${mono?' mono':''}`,value)));
     card.append(details);
     const controls=el('div','session-actions');
     for(const [action,label,symbol]of [['connect','Connect','play'],['disconnect','Disconnect','stop'],['reconnect','Reconnect','refresh']]){
       const button=actionButton(label,symbol,`${action}-session`,s.id,`button small${action==='connect'?' soft':''}`);
       button.setAttribute('aria-label',`${label} session ${s.name||'Unnamed session'}`);
-      button.disabled=pending||!metrics.total||(action==='connect'?metrics.active>=metrics.total:metrics.active===0);
-      if(!metrics.total)button.title='Add port forwarding to this session first.';
+      button.disabled=pending||(metrics.total?(action==='connect'?metrics.active>=metrics.total:metrics.active===0):(action==='connect'?!!s.desired_running:!s.desired_running));
       if(pending)button.setAttribute('aria-busy','true');
       controls.append(button);
     }
-    card.append(controls,el('p','session-control-note',metrics.total?'Controls apply to this session’s port forwarding.':'Add forwarding to this session to enable connection controls.'));
+    card.append(controls,el('p','session-control-note',metrics.total?'Controls apply to this session’s port forwarding.':'Connect an authenticated SSH session without a local port or shell.'));
     if(metrics.status==='error'){
       const error=metrics.own.find(t=>t.last_error)?.last_error;
       if(error){const message=el('div','session-error',String(error).slice(0,240));message.title=String(error);card.append(message)}
@@ -211,7 +214,7 @@ function renderPlatform(){
   $('credentialNote').textContent=`Passwords you enter are saved securely in ${store==='Keychain'?'macOS Keychain':store}. Saved passwords are never displayed here.`;
   if($('lockedScreen').hidden)$('lockedCopy').textContent=`Open this panel from HopHarbor on ${device} to sign in securely.`;
 }
-function render(){renderPlatform();const focused=document.activeElement;const focusInfo=focused&&focused.dataset.action?{action:focused.dataset.action,id:focused.dataset.id,container:focused.closest('#dashboardTunnels,#allTunnels,#serverGrid')?.id}:null;const active=state.tunnels.filter(t=>['connected','degraded'].includes(t.status)).length;const errors=state.tunnels.filter(t=>t.status==='error').length;const starting=state.tunnels.filter(t=>t.status==='starting').length;$('metricActive').textContent=num(active);$('metricTunnels').textContent=num(state.tunnels.length);$('metricServers').textContent=num(state.servers.length);$('navTunnelCount').textContent=num(state.tunnels.length);$('metricActiveFoot').textContent=errors?`${num(errors)} forwarding configuration${errors===1?' needs':'s need'} attention`:starting?`${num(starting)} connecting`:'SSH connection status';$('metricServersFoot').textContent=state.servers.length?'Connection settings and firewalls':'Add a session to get started';$('lastUpdated').textContent=lastSuccess?`Updated at ${timeText(lastSuccess)}`:'Loading status...';const appInfo=window.HopHarborNativeVersion||state.service;$('appVersion').textContent=`v${String(appInfo.version||'1.3.2').replace(/^v/i,'').slice(0,32)} · build ${String(appInfo.build??12).slice(0,16)}`;const migration=state.migration;$('migrationBanner').hidden=setupNoteDismissed||!migration.message||migration.phase==='complete';$('migrationTitle').textContent=migration.phase==='testing'?'Testing mode · ':'Migration status · ';$('migrationText').textContent=migration.message||'';renderTunnels();renderServers();renderLogs();if(focusInfo&&focusInfo.container){const replacement=Array.from($(focusInfo.container).querySelectorAll('button[data-action]')).find(b=>b.dataset.action===focusInfo.action&&b.dataset.id===focusInfo.id&&!b.disabled);if(replacement)replacement.focus({preventScroll:true})}}
+function render(){renderPlatform();const focused=document.activeElement;const focusInfo=focused&&focused.dataset.action?{action:focused.dataset.action,id:focused.dataset.id,container:focused.closest('#dashboardTunnels,#allTunnels,#serverGrid')?.id}:null;const active=state.tunnels.filter(t=>['connected','degraded'].includes(t.status)).length;const errors=state.tunnels.filter(t=>t.status==='error').length;const starting=state.tunnels.filter(t=>t.status==='starting').length;$('metricActive').textContent=num(active);$('metricTunnels').textContent=num(state.tunnels.length);$('metricServers').textContent=num(state.servers.length);$('navTunnelCount').textContent=num(state.tunnels.length);$('metricActiveFoot').textContent=errors?`${num(errors)} forwarding configuration${errors===1?' needs':'s need'} attention`:starting?`${num(starting)} connecting`:'SSH connection status';$('metricServersFoot').textContent=state.servers.length?'Connection settings and firewalls':'Add a session to get started';$('lastUpdated').textContent=lastSuccess?`Updated at ${timeText(lastSuccess)}`:'Loading status...';const appInfo=window.HopHarborNativeVersion||state.service;$('appVersion').textContent=`v${String(appInfo.version||'1.4.0').replace(/^v/i,'').slice(0,32)} · build ${String(appInfo.build??13).slice(0,16)}`;renderUpdatesSummary();const migration=state.migration;$('migrationBanner').hidden=setupNoteDismissed||!migration.message||migration.phase==='complete';$('migrationTitle').textContent=migration.phase==='testing'?'Testing mode · ':'Migration status · ';$('migrationText').textContent=migration.message||'';renderTunnels();renderServers();renderLogs();renderRelease();if(focusInfo&&focusInfo.container){const replacement=Array.from($(focusInfo.container).querySelectorAll('button[data-action]')).find(b=>b.dataset.action===focusInfo.action&&b.dataset.id===focusInfo.id&&!b.disabled);if(replacement)replacement.focus({preventScroll:true})}}
 function toast(message,error=false){const n=children(el('div',`toast${error?' error':''}`),icon(error?'warning':'check'),el('span','',String(message).slice(0,350)));$('toastRegion').append(n);setTimeout(()=>n.remove(),error?8000:4500)}
 async function confirmDelete(title,message){const d=$('confirmDialog');$('confirmTitle').textContent=title;$('confirmCopy').textContent=message;d.showModal();return new Promise(resolve=>{let finished=false;const finish=value=>{if(finished)return;finished=true;d.close();$('confirmYes').onclick=null;$('confirmNo').onclick=null;$('confirmClose').onclick=null;d.oncancel=null;resolve(value)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false);$('confirmClose').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false)}})}
 async function tunnelAction(action,id){const t=state.tunnels.find(t=>String(t.id)===String(id));if(!t)return;if(action==='copy'){const address=`127.0.0.1:${t.local_port}`;try{await navigator.clipboard.writeText(address);toast('Local endpoint copied.')}catch{toast(address)}return}if(action==='edit'){if(isRunning(t)){toast('Disconnect this forwarding before editing.',true);return}openTunnel(t);return}if(busy.has(String(id)))return;if(action==='delete'&&!await confirmDelete('Delete forwarding',`Delete forwarding "${t.name}"? The saved session will remain available.`))return;busy.add(String(id));renderTunnels();try{const result=await request(`/api/tunnels/${encodeURIComponent(id)}${action==='delete'?'':`/${action}`}`,{method:action==='delete'?'DELETE':'POST',body:{}});if(action==='test')toast(result.message||'Traffic test finished.',!result.ok);else toast(action==='delete'?'Forwarding deleted.':action==='start'?'Connection requested.':action==='stop'?'Disconnection requested.':'Reconnection requested.');await refresh(true)}catch(err){toast(errorMessage(err),true)}finally{busy.delete(String(id));renderTunnels()}}
@@ -228,7 +231,7 @@ async function sessionConnectionAction(action,id){
     const succeeded=Number(result.summary?.succeeded??Math.max(0,requested-failed));
     const firstError=results.find(r=>!r.ok&&r.error)?.error;
     if(failed)toast(`${server.name}: ${num(succeeded)} of ${num(requested)} forwarding requests accepted. ${num(failed)} failed.${firstError?` ${firstError}`:''}`,true);
-    else toast(`${server.name}: ${action==='connect'?'Connect':action==='disconnect'?'Disconnect':'Reconnect'} requested for ${num(requested)} forward${requested===1?'':'s'}.`);
+    else toast(`${server.name}: ${action==='connect'?'Connect':action==='disconnect'?'Disconnect':'Reconnect'} requested for ${num(requested)} connection${requested===1?'':'s'}.`);
     await refresh(true);
   }catch(err){toast(errorMessage(err),true)}
   finally{sessionBusy.delete(String(id));for(const t of own)busy.delete(String(t.id));renderServers();renderTunnels()}
@@ -236,15 +239,207 @@ async function sessionConnectionAction(action,id){
 async function serverAction(action,id){const s=serverById(id);if(!s)return;if(['connect-session','disconnect-session','reconnect-session'].includes(action))return sessionConnectionAction(action.replace('-session',''),id);if(action==='edit-server'){openServer(s);return}if(!await confirmDelete('Delete session',`Delete the saved session "${s.name}"?`))return;try{await request(`/api/servers/${encodeURIComponent(id)}`,{method:'DELETE'});toast('Session deleted.');await refresh(true)}catch(err){toast(errorMessage(err),true)}}
 function option(value,label){const n=el('option','',label);n.value=String(value??'');return n}
 function field(form,name){return form.elements.namedItem(name)}
-function openServer(server=null){const form=$('serverForm');form.reset();clearSensitiveFields();form.dataset.hasPassword=server?.has_password?'true':'false';form.dataset.hasKeyPassphrase=server?.has_key_passphrase?'true':'false';$('serverFormError').textContent='';$('serverDialogTitle').textContent=server?'Edit session':'New session';field(form,'id').value=server?.id||'';field(form,'name').value=server?.name||'';field(form,'host').value=server?.host||'';field(form,'port').value=server?.port||22;field(form,'username').value=server?.username||'';field(form,'keepalive_interval').value=server?.keepalive_interval??30;field(form,'keepalive_count').value=server?.keepalive_count??3;const identity=server?server.identity_file||'':state.service.default_identity_file||state.servers.find(s=>s.identity_file)?.identity_file||'';field(form,'identity_file').value=identity;field(form,'auth_mode').value=server?authMode(server):identity?'key':'agent';const choices=[option('','None'),...state.servers.filter(s=>String(s.id)!==String(server?.id)).map(s=>option(s.id,s.name))];field(form,'jump_id').replaceChildren(...choices);field(form,'jump_id').value=server?.jump_id||'';$('hostKeyHelp').textContent=server?.host_key_trusted?'This host key is already verified. Leave this field blank to keep the trusted key.':'Obtain the trusted host public key from the server administrator. This is separate from your login key.';$('serverDialog').querySelectorAll('details').forEach(details=>details.open=false);updateAuthForm();$('serverDialog').showModal();$('serverName').focus({preventScroll:true});$('serverDialog').querySelector('.modal-body').scrollTop=0}
+function openServer(server=null){const form=$('serverForm');form.reset();clearSensitiveFields();form.dataset.hasPassword=server?.has_password?'true':'false';form.dataset.hasKeyPassphrase=server?.has_key_passphrase?'true':'false';$('serverFormError').textContent='';$('serverDialogTitle').textContent=server?'Edit session':'New session';field(form,'id').value=server?.id||'';field(form,'name').value=server?.name||'';field(form,'host').value=server?.host||'';field(form,'port').value=server?.port||22;field(form,'username').value=server?.username||'';field(form,'keepalive_interval').value=server?.keepalive_interval??30;field(form,'keepalive_count').value=server?.keepalive_count??3;const identity=server?server.identity_file||'':state.service.default_identity_file||state.servers.find(s=>s.identity_file)?.identity_file||'';field(form,'identity_file').value=identity;field(form,'auth_mode').value=server?authMode(server):identity?'key':'agent';const choices=[option('','None'),...state.servers.filter(s=>String(s.id)!==String(server?.id)).map(s=>option(s.id,s.name))];field(form,'jump_id').replaceChildren(...choices);field(form,'jump_id').value=server?.jump_id||'';form.dataset.originalHost=server?.host||'';form.dataset.originalPort=String(server?.port||22);form.dataset.originalTrusted=server?.host_key_trusted?'true':'false';delete form.dataset.trustTicket;$('verifyEndpoint').hidden=!server?.host_key_trusted; $('hostKeyHelp').textContent=server?.host_key_trusted?'The saved endpoint is verified. Changing Hostname or Port requires verification before saving.':'Obtain the trusted host public key from the server administrator. This is separate from your login key.';$('serverDialog').querySelectorAll('details').forEach(details=>details.open=false);updateAuthForm();$('serverDialog').showModal();$('serverName').focus({preventScroll:true});$('serverDialog').querySelector('.modal-body').scrollTop=0}
 function updateAuthForm(){const form=$('serverForm');const mode=field(form,'auth_mode').value;const useKey=['key','key_password'].includes(mode);const usePassword=['password','key_password'].includes(mode);$('identityField').hidden=!useKey;$('keyPassphraseField').hidden=!useKey;$('passwordField').hidden=!usePassword;field(form,'identity_file').required=false;field(form,'password').required=false;field(form,'key_passphrase').required=false;if(!useKey)field(form,'key_passphrase').value='';if(!usePassword)field(form,'password').value='';const hasPassword=form.dataset.hasPassword==='true';const hasKeyPassphrase=form.dataset.hasKeyPassphrase==='true';field(form,'password').placeholder=hasPassword?'Leave blank to keep the saved password':'You can add this later';$('passwordHelp').textContent=hasPassword?`A password is saved in ${credentialStore()}. Leave this field blank to keep it.`:'No password is saved for this session. You can add it later.';field(form,'key_passphrase').placeholder=hasKeyPassphrase?'Leave blank to keep the saved passphrase':'Leave blank if the key is not encrypted';$('keyPassphraseHelp').textContent=hasKeyPassphrase?`A key passphrase is saved securely in ${credentialStore()} and is never displayed here.`:'Needed only for an encrypted private key. You can add it later.'}
 function openTunnel(tunnel=null,serverId=null){if(!state.servers.length){toast('Add a session first.');openServer();return}const form=$('tunnelForm');form.reset();$('tunnelFormError').textContent='';$('tunnelDialogTitle').textContent=tunnel?'Edit forwarding':'New forwarding';field(form,'id').value=tunnel?.id||'';field(form,'name').value=tunnel?.name||'';field(form,'kind').value=tunnel?.kind||'socks';field(form,'server_id').replaceChildren(...state.servers.map(s=>option(s.id,s.name)));field(form,'server_id').value=tunnel?.server_id||serverId||state.servers[0].id;field(form,'local_port').value=tunnel?.local_port||'';field(form,'remote_host').value=tunnel?.remote_host||'127.0.0.1';field(form,'remote_port').value=tunnel?.remote_port||'';field(form,'pool_size').value=tunnel?.pool_size||1;field(form,'autostart').checked=!!tunnel?.autostart;updateTunnelForm();$('tunnelDialog').showModal();$('tunnelName').focus({preventScroll:true});$('tunnelDialog').querySelector('.modal-body').scrollTop=0}
 function updateTunnelForm(){const form=$('tunnelForm');const kind=field(form,'kind').value;const local=kind==='local';$('tunnelTargetHostField').hidden=!local;$('tunnelTargetPortField').hidden=!local;field(form,'remote_host').required=local;field(form,'remote_port').required=local;const notes={socks:'Creates a local SOCKS5 proxy on 127.0.0.1. Save the configuration, then choose Connect when ready.',http:'Creates a local HTTP proxy through SSH on 127.0.0.1. Save the configuration, then choose Connect when ready.',local:'Forwards a local TCP port through SSH. The destination must be reachable from the SSH host. Saving does not connect.'};$('tunnelFormHelp').textContent=notes[kind]||notes.socks}
 function validatePort(value,min=1){return Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=65535}
 function validateHost(value){return /^[A-Za-z0-9_.:\[\]-]+$/.test(value)&&value.length<=253&&!value.startsWith('-')}
-async function saveServer(event){event.preventDefault();const form=$('serverForm');if(!form.reportValidity())return;const id=field(form,'id').value;const data={name:field(form,'name').value.trim(),host:field(form,'host').value.trim(),port:Number(field(form,'port').value),username:field(form,'username').value.trim(),auth_mode:field(form,'auth_mode').value,identity_file:['key','key_password'].includes(field(form,'auth_mode').value)?field(form,'identity_file').value.trim():'',jump_id:field(form,'jump_id').value||null,keepalive_interval:Number(field(form,'keepalive_interval').value),keepalive_count:Number(field(form,'keepalive_count').value)};const password=field(form,'password').value;const keyPassphrase=field(form,'key_passphrase').value;if(['password','key_password'].includes(data.auth_mode)&&password.length)data.password=password;if(['key','key_password'].includes(data.auth_mode)&&keyPassphrase.length)data.key_passphrase=keyPassphrase;const hostKey=field(form,'host_key').value.trim();if(hostKey)data.host_key=hostKey;const error=$('serverFormError');error.textContent='';if(!data.name){error.textContent='Enter a Session Name.';return}if(!validateHost(data.host)){error.textContent='Enter a hostname or IP address. Enter the username in its own field.';return}if(!validatePort(data.port)){error.textContent='Port must be between 1 and 65535.';return}if(!data.username||/\s/.test(data.username)||data.username.startsWith('-')){error.textContent='Enter a valid SSH username without spaces.';return}if(!Number.isInteger(data.keepalive_interval)||data.keepalive_interval<0||data.keepalive_interval>600){error.textContent='Keepalive interval must be between 0 and 600 seconds.';return}if(!Number.isInteger(data.keepalive_count)||data.keepalive_count<1||data.keepalive_count>10){error.textContent='Missed replies must be between 1 and 10.';return}if(data.jump_id){let current=serverById(data.jump_id);const seen=new Set();while(current&&!seen.has(String(current.id))){if(id&&String(current.id)===String(id)){error.textContent='This Firewall creates a connection loop. Choose another session.';return}seen.add(String(current.id));current=current.jump_id?serverById(current.jump_id):null}}const button=$('saveServerButton');button.disabled=true;button.textContent='Saving...';try{await request(`/api/servers${id?`/${encodeURIComponent(id)}`:''}`,{method:id?'PUT':'POST',body:data});clearSensitiveFields();$('serverDialog').close();toast(id?'Session changes saved.':'Session added.');await refresh(true)}catch(err){error.textContent=errorMessage(err)}finally{button.disabled=false;button.textContent='Save session'}}
+async function saveServer(event){event.preventDefault();const form=$('serverForm');if(!form.reportValidity())return;const id=field(form,'id').value;const data={name:field(form,'name').value.trim(),host:field(form,'host').value.trim(),port:Number(field(form,'port').value),username:field(form,'username').value.trim(),auth_mode:field(form,'auth_mode').value,identity_file:['key','key_password'].includes(field(form,'auth_mode').value)?field(form,'identity_file').value.trim():'',jump_id:field(form,'jump_id').value||null,keepalive_interval:Number(field(form,'keepalive_interval').value),keepalive_count:Number(field(form,'keepalive_count').value)};const password=field(form,'password').value;const keyPassphrase=field(form,'key_passphrase').value;if(['password','key_password'].includes(data.auth_mode)&&password.length)data.password=password;if(['key','key_password'].includes(data.auth_mode)&&keyPassphrase.length)data.key_passphrase=keyPassphrase;const hostKey=field(form,'host_key').value.trim();if(hostKey)data.host_key=hostKey;else if(form.dataset.trustTicket)data.trust_ticket=form.dataset.trustTicket;const error=$('serverFormError');error.textContent='';if(id&&form.dataset.originalTrusted==='true'&&(data.host!==form.dataset.originalHost||String(data.port)!==form.dataset.originalPort)&&!data.host_key&&!data.trust_ticket){error.textContent='Verify this new endpoint or enter a manually trusted host key before saving. Your saved endpoint is unchanged.';error.scrollIntoView({block:'nearest'});return}if(!data.name){error.textContent='Enter a Session Name.';return}if(!validateHost(data.host)){error.textContent='Enter a hostname or IP address. Enter the username in its own field.';return}if(!validatePort(data.port)){error.textContent='Port must be between 1 and 65535.';return}if(!data.username||/\s/.test(data.username)||data.username.startsWith('-')){error.textContent='Enter a valid SSH username without spaces.';return}if(!Number.isInteger(data.keepalive_interval)||data.keepalive_interval<0||data.keepalive_interval>600){error.textContent='Keepalive interval must be between 0 and 600 seconds.';return}if(!Number.isInteger(data.keepalive_count)||data.keepalive_count<1||data.keepalive_count>10){error.textContent='Missed replies must be between 1 and 10.';return}if(data.jump_id){let current=serverById(data.jump_id);const seen=new Set();while(current&&!seen.has(String(current.id))){if(id&&String(current.id)===String(id)){error.textContent='This Firewall creates a connection loop. Choose another session.';return}seen.add(String(current.id));current=current.jump_id?serverById(current.jump_id):null}}const button=$('saveServerButton');button.disabled=true;button.textContent='Saving...';try{await request(`/api/servers${id?`/${encodeURIComponent(id)}`:''}`,{method:id?'PUT':'POST',body:data});clearSensitiveFields();$('serverDialog').close();toast(id?'Session changes saved.':'Session added.');await refresh(true)}catch(err){error.textContent=errorMessage(err)}finally{button.disabled=false;button.textContent='Save session'}}
 async function saveTunnel(event){event.preventDefault();const form=$('tunnelForm');if(!form.reportValidity())return;const id=field(form,'id').value;const kind=field(form,'kind').value;const data={name:field(form,'name').value.trim(),server_id:field(form,'server_id').value,kind,local_port:Number(field(form,'local_port').value),pool_size:Number(field(form,'pool_size').value),remote_host:kind==='local'?field(form,'remote_host').value.trim():'',remote_port:kind==='local'?Number(field(form,'remote_port').value):0,autostart:field(form,'autostart').checked};const error=$('tunnelFormError');error.textContent='';if(!data.name){error.textContent='Enter a Forwarding Name.';return}if(!validatePort(data.local_port,1024)){error.textContent='Local port must be between 1024 and 65535.';return}if(state.tunnels.some(t=>String(t.id)!==String(id)&&Number(t.local_port)===data.local_port)){error.textContent='This local port is already assigned to another forwarding configuration. Choose another port.';return}if(!serverById(data.server_id)){error.textContent='Choose a saved session.';return}if(!Number.isInteger(data.pool_size)||data.pool_size<1||data.pool_size>4){error.textContent='Choose between 1 and 4 SSH sessions.';return}if(kind==='local'&&(!validateHost(data.remote_host)||!validatePort(data.remote_port))){error.textContent='Enter a valid destination hostname and port.';return}const button=$('saveTunnelButton');button.disabled=true;button.textContent='Saving...';try{await request(`/api/tunnels${id?`/${encodeURIComponent(id)}`:''}`,{method:id?'PUT':'POST',body:data});$('tunnelDialog').close();toast(id?'Forwarding changes saved.':'Forwarding added.');await refresh(true)}catch(err){error.textContent=errorMessage(err)}finally{button.disabled=false;button.textContent='Save forwarding'}}
 for(const n of document.querySelectorAll('[data-view]'))n.addEventListener('click',()=>goView(n.dataset.view));for(const n of document.querySelectorAll('[data-go-view]'))n.addEventListener('click',()=>goView(n.dataset.goView));for(const n of document.querySelectorAll('[data-close-dialog]'))n.addEventListener('click',()=>$(n.dataset.closeDialog).close());for(const n of document.querySelectorAll('[data-filter]'))n.addEventListener('click',()=>{filter=n.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>{const active=x.dataset.filter===filter;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active))});renderTunnels()});$('primaryAction').addEventListener('click',()=>currentView==='servers'?openServer():openTunnel());$('refreshButton').addEventListener('click',()=>refresh(true));$('retryButton').addEventListener('click',()=>refresh(true));$('lockedRetry').addEventListener('click',retryLockedPanel);$('tunnelSearch').addEventListener('input',renderTunnels);$('logSearch').addEventListener('input',renderLogs);$('serverAuth').addEventListener('change',updateAuthForm);$('serverDialog').addEventListener('close',clearSensitiveFields);document.querySelectorAll('input[name="kind"]').forEach(n=>n.addEventListener('change',updateTunnelForm));$('serverForm').addEventListener('submit',saveServer);$('tunnelForm').addEventListener('submit',saveTunnel);for(const id of ['dashboardTunnels','allTunnels'])$(id).addEventListener('click',event=>{const button=event.target.closest('button[data-action]');if(button&&!button.disabled){if(button.dataset.action==='add-forwarding')openTunnel(null,button.dataset.id);else tunnelAction(button.dataset.action,button.dataset.id)}});$('serverGrid').addEventListener('click',event=>{const button=event.target.closest('button[data-action]');if(button&&!button.disabled)serverAction(button.dataset.action,button.dataset.id)});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true)});setInterval(()=>{if(!document.hidden&&authorized)refresh()},5000);
 async function bootstrap(){const parameters=new URLSearchParams(location.hash.slice(1));const token=parameters.get('token');if(token){history.replaceState(null,'',location.pathname+location.search);try{await request('/api/session',{method:'POST',body:{token}});authorized=true;$('lockedScreen').hidden=true}catch(err){showLocked(errorMessage(err));return}}await refresh(true)}
 renderPlatform();
 bootstrap();
+
+// Proof tickets belong to an exact editor snapshot. Late replies never restore
+// trust after another field edit, cancellation, or opening a different session.
+let endpointEditGeneration=0;
+function endpointEdited(){
+  endpointEditGeneration++;const form=$('serverForm');delete form.dataset.trustTicket;
+  const changed=field(form,'host').value.trim()!==form.dataset.originalHost||String(Number(field(form,'port').value))!==form.dataset.originalPort;
+  $('hostKeyHelp').textContent=changed?'This endpoint is unverified. Check it with the previous trusted key, or enter a host key obtained from a trusted source.':form.dataset.originalTrusted==='true'?'The saved endpoint has a trusted key.':'Obtain the trusted host public key from the server administrator.';
+}
+$('serverForm').addEventListener('input',endpointEdited);
+$('serverForm').addEventListener('change',endpointEdited);
+$('serverDialog').addEventListener('close',()=>{endpointEditGeneration++;delete $('serverForm').dataset.trustTicket});
+$('verifyEndpoint').addEventListener('click',async()=>{
+  const form=$('serverForm'),id=field(form,'id').value,generation=++endpointEditGeneration;
+  const snapshot=JSON.stringify(Array.from(form.elements).map(e=>[e.name,e.value]));
+  const button=$('verifyEndpoint');button.disabled=true;$('serverFormError').textContent='';$('hostKeyHelp').textContent='Checking strict host-key continuity and SSH authentication…';
+  try{
+    const result=await request(`/api/servers/${encodeURIComponent(id)}/verify-endpoint`,{method:'POST',body:{host:field(form,'host').value.trim(),port:Number(field(form,'port').value)}});
+    if(generation!==endpointEditGeneration||!$('serverDialog').open||snapshot!==JSON.stringify(Array.from(form.elements).map(e=>[e.name,e.value])))return;
+    form.dataset.trustTicket=result.ticket;$('hostKeyHelp').textContent=result.message;
+  }catch(error){if(generation===endpointEditGeneration)$('hostKeyHelp').textContent=errorMessage(error)}finally{button.disabled=false}
+});
+let bulkBusy=false;
+for(const button of document.querySelectorAll('[data-bulk-scope]'))button.addEventListener('click',async()=>{
+  if(bulkBusy||busy.size||sessionBusy.size)return;bulkBusy=true;
+  const controls=document.querySelectorAll('[data-bulk-scope]');controls.forEach(b=>b.disabled=true);
+  try{
+    const result=await request(`/api/bulk/${button.dataset.bulkScope}/${button.dataset.bulkAction}`,{method:'POST'});
+    $('bulkResults').textContent=`${result.summary.succeeded} of ${result.summary.requested} requests accepted; ${result.summary.failed} failed.\n\n`+result.results.map(r=>`${r.name}: ${r.ok?'Requested; monitor connection status':r.error}`).join('\n');
+    $('bulkDialog').showModal();await refresh(true);
+  }catch(error){toast(errorMessage(error),true)}finally{bulkBusy=false;controls.forEach(b=>b.disabled=false)}
+});
+let importTicket=null;
+$('importConfig').addEventListener('click',()=>{$('configFile').value='';$('configFile').click()});
+$('configFile').addEventListener('change',async event=>{
+  importTicket=null;const file=event.target.files?.[0];if(!file)return;
+  try{
+    if(file.size>262144)throw new Error('Configuration files must be 256 KiB or smaller.');
+    const result=await request('/api/config/preview',{method:'POST',body:JSON.parse(await file.text())});
+    importTicket=result.ticket;$('importError').textContent='';
+    $('importPreview').textContent=`File: ${file.name}\n\n`+JSON.stringify(result.summary,null,2)+'\n\n'+result.warnings.join('\n')+'\n\n'+(result.changes||[]).join('\n');
+    $('importDialog').showModal();
+  }catch(error){toast(errorMessage(error),true)}
+});
+$('applyImport').addEventListener('click',async()=>{
+  const button=$('applyImport');button.disabled=true;
+  try{await request('/api/config/apply',{method:'POST',body:{ticket:importTicket}});importTicket=null;$('importDialog').close();toast('Configuration merged. Imported connections remain stopped.');await refresh(true)}catch(error){$('importError').textContent=errorMessage(error)}finally{button.disabled=false}
+});
+$('exportConfig').addEventListener('click',async()=>{
+  try{
+    const document=await request('/api/config/export');
+    if(window.webkit?.messageHandlers?.hopharborPanel){postNativePanelMessage({action:'exportConfiguration',document});return}
+    const url=URL.createObjectURL(new Blob([JSON.stringify(document,null,2)+'\n'],{type:'application/json'}));
+    const link=el('a');link.href=url;link.download='HopHarbor-configuration.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(error){toast(errorMessage(error),true)}
+});
+window.addEventListener('hopharbor-file-result',event=>{if(event.detail?.status==='saved')toast('Configuration exported.');else if(event.detail?.status==='error')toast('Could not save the configuration file.',true)});
+function renderRelease() {
+  $('undoImport').hidden = !state.service.import_undo_available;
+  const release = state.service.release || {};
+  const noticeVersion = newReleaseVersion();
+  let text = 'Release information has not been checked.';
+  if (noticeVersion) text = `Version ${noticeVersion} is available.`;
+  else if (['available', 'current', 'older'].includes(release.status) && stableVersion(release.latest_version)) {
+    text = `Published stable release: ${release.latest_version}.`;
+  } else if (release.status === 'unavailable') {
+    text = 'Release information is unavailable. Try again later.';
+  }
+  $('releaseStatus').textContent = text + (release.checking ? ' Checking…' : '');
+  $('releaseLink').href = officialReleaseURL(release.url) || OFFICIAL_RELEASES;
+  $('releaseLink').textContent = noticeVersion ? 'View official release' : 'Official releases';
+  $('checkRelease').disabled = !!release.checking;
+  $('updateNotice').hidden = !noticeVersion;
+  renderUpdatesSummary();
+  positionUpdates();
+  maybeShowReleaseNotice();
+}
+$('checkRelease').addEventListener('click',async()=>{try{state.service.release=await request('/api/release/check',{method:'POST'});renderRelease()}catch(error){toast(errorMessage(error),true)}});
+
+$('undoImport').addEventListener('click',async()=>{try{await request('/api/config/undo',{method:'POST'});toast('Last import undone.');await refresh(true)}catch(error){toast(errorMessage(error),true)}});
+
+const RELEASE_NOTICE_KEY = 'hopharbor.lastSeenRelease';
+const OFFICIAL_RELEASES = 'https://github.com/kiyanibehzad/HopHarbor/releases';
+const OFFICIAL_RELEASE_TAG = /^https:\/\/github\.com\/kiyanibehzad\/HopHarbor\/releases\/tag\/v?\d{1,6}\.\d{1,6}\.\d{1,6}$/;
+let releaseNoticeSeen = '';
+try { releaseNoticeSeen = localStorage.getItem(RELEASE_NOTICE_KEY) || ''; } catch {}
+
+function officialReleaseURL(value) {
+  return typeof value === 'string' && OFFICIAL_RELEASE_TAG.test(value) ? value : null;
+}
+
+function stableVersion(value) {
+  const match = typeof value === 'string' && /^v?(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/.exec(value);
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function versionAfter(value, other) {
+  const a = stableVersion(value), b = stableVersion(other);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
+function newReleaseVersion() {
+  const release = state.service.release || {};
+  const installed = window.HopHarborNativeVersion?.version || state.service.version;
+  const url = officialReleaseURL(release.url);
+  const version = stableVersion(release.latest_version);
+  if (!['available', 'current', 'older'].includes(release.status) || !url || !version) return null;
+  const tagVersion = stableVersion(url.slice(url.lastIndexOf('/') + 1));
+  if (!tagVersion || tagVersion.join('.') !== version.join('.')) return null;
+  return versionAfter(release.latest_version, installed) ? version.join('.') : null;
+}
+
+function acknowledgeRelease() {
+  const version = newReleaseVersion();
+  if (version && (!stableVersion(releaseNoticeSeen) || versionAfter(version, releaseNoticeSeen))) {
+    releaseNoticeSeen = version;
+    try { localStorage.setItem(RELEASE_NOTICE_KEY, version); } catch {}
+  }
+}
+
+function renderUpdatesSummary() {
+  const version = newReleaseVersion();
+  const notice = version ? ` Version ${version} is available.` : '';
+  const status = $('serviceLabel').title || 'Connecting to local service';
+  const label = `${status}. About and updates.${notice}`;
+  $('updatesToggle').title = label;
+  $('updatesToggle').setAttribute('aria-label', label);
+}
+
+function positionUpdates() {
+  if ($('updatesToggle').getAttribute('aria-expanded') !== 'true') return;
+  const panel = $('updatesContent');
+  const anchor = $('updatesToggle').getBoundingClientRect();
+  const width = Math.min(260, window.innerWidth - 24);
+  panel.style.width = `${width}px`;
+  const height = panel.getBoundingClientRect().height;
+  let left = window.innerWidth <= 580 ? anchor.right - width : anchor.left;
+  left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
+  let top = anchor.top - height - 10;
+  if (top < 12) top = anchor.bottom + 10;
+  top = Math.max(12, Math.min(top, window.innerHeight - height - 12));
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
+function openUpdates(focus = false) {
+  $('updatesPanel').classList.add('updates-open');
+  $('updatesToggle').setAttribute('aria-expanded', 'true');
+  positionUpdates();
+  acknowledgeRelease();
+  if (focus) $('checkRelease').focus({preventScroll: true});
+}
+
+function closeUpdates(returnFocus = false) {
+  if ($('updatesToggle').getAttribute('aria-expanded') === 'true') acknowledgeRelease();
+  $('updatesPanel').classList.remove('updates-open');
+  $('updatesToggle').setAttribute('aria-expanded', 'false');
+  if (returnFocus) $('updatesToggle').focus({preventScroll: true});
+}
+
+function maybeShowReleaseNotice() {
+  const version = newReleaseVersion();
+  if (!version || !loaded || !authorized || document.hidden || document.querySelector('dialog[open]')) return;
+  if (stableVersion(releaseNoticeSeen) && !versionAfter(version, releaseNoticeSeen)) return;
+  // Automatic notices never move focus, activate a window, or navigate a URL.
+  openUpdates(false);
+}
+
+$('updatesToggle').addEventListener('click', () => {
+  if ($('updatesToggle').getAttribute('aria-expanded') === 'true') closeUpdates();
+  else openUpdates(true);
+});
+$('updatesClose').addEventListener('click', () => closeUpdates(true));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('updatesToggle').getAttribute('aria-expanded') === 'true') {
+    closeUpdates(true);
+    event.preventDefault();
+  }
+});
+document.addEventListener('click', event => {
+  if (!$('updatesPanel').contains(event.target)) closeUpdates();
+});
+document.addEventListener('close', maybeShowReleaseNotice, true);
+document.addEventListener('visibilitychange', maybeShowReleaseNotice);
+window.addEventListener('resize', positionUpdates);
+window.addEventListener('storage', event => {
+  if (event.key === RELEASE_NOTICE_KEY) releaseNoticeSeen = event.newValue || '';
+});

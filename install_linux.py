@@ -25,7 +25,7 @@ GOST_SHA256 = {
     'arm64': 'c58af4a74362a95caa7f580817ad624497d192dfeb60468dc8a4c70c293c6b01',
 }
 APP_FILES = ('manager.py', 'ssh_hop.py', 'askpass.py', 'log_policy.py',
-             'wake_monitor.py', 'credentials.py', 'agent_environment.py', 'linux_desktop.py', 'install_linux.py')
+             'wake_monitor.py', 'session_tools.py', 'configuration_portability.py', 'release_check.py', 'credentials.py', 'agent_environment.py', 'linux_desktop.py', 'install_linux.py')
 DEPENDENCIES = ('python3', 'python3-gi', 'gir1.2-gtk-3.0', 'gir1.2-webkit2-4.1',
                 'gir1.2-ayatanaappindicator3-0.1', 'gir1.2-secret-1', 'gnome-keyring',
                 'openssh-client', 'curl', 'dbus-user-session')

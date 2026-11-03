@@ -9,18 +9,20 @@ private struct PanelControl: Decodable {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
     private var statusItem: NSStatusItem!
     private var window: NSWindow!
     private var rootView: NSView!
     private var webView: WKWebView?
     private var activePort: Int?
+    private var fileDialogActive = false
     private var allowTermination = false
     private var recoveryPolicy = PanelRecoveryPolicy()
     private var recoveryWork: DispatchWorkItem?
     private var pageGeneration = 0
     private var needsReauthentication = false
 #if HOPHARBOR_PANEL_TESTING
+    private let testingWebsiteDataStore = WKWebsiteDataStore.nonPersistent()
     private var blockedFrameNavigations = 0
     private var lastMainFrameNavigation: WKNavigationAction?
 #endif
@@ -249,7 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             ))
         }
 #if HOPHARBOR_PANEL_TESTING
-        configuration.websiteDataStore = .nonPersistent()
+        configuration.websiteDataStore = testingWebsiteDataStore
 #else
         configuration.websiteDataStore = .default()
 #endif
@@ -258,6 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let browser = WKWebView(frame: .zero, configuration: configuration)
         browser.translatesAutoresizingMaskIntoConstraints = false
         browser.navigationDelegate = self
+        browser.uiDelegate = self
         browser.allowsBackForwardNavigationGestures = false
         browser.underPageBackgroundColor = .windowBackgroundColor
         webView = browser
@@ -280,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: "hopharborPanel")
         webView?.stopLoading()
         webView?.navigationDelegate = nil
+        webView?.uiDelegate = nil
         webView?.loadHTMLString("<html></html>", baseURL: nil)
         webView?.removeFromSuperview()
         webView = nil
@@ -316,7 +320,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 scheme: origin.protocol, host: origin.host, port: origin.port,
                 frameURL: message.frameInfo.request.url, activePort: activePort),
               let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
-        if action == "ready", body.count == 1 {
+        if action == "exportConfiguration", body.count == 2,
+           let document = body["document"] as? [String: Any],
+           document["format"] as? String == "HopHarbor configuration",
+           let data = try? JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys]),
+           data.count <= 262_144, let browser = webView, !fileDialogActive {
+            exportConfiguration(data, browser: browser)
+        } else if action == "ready", body.count == 1 {
             recoveryWork?.cancel()
             recoveryWork = nil
             recoveryPolicy.authenticated()
@@ -325,6 +335,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                   let reason = body["reason"] as? String,
                   ["authentication", "retry"].contains(reason), let browser = webView {
             recoverPanel(browser, manual: reason == "retry")
+        }
+    }
+
+    // The page can request a dialog, never a filesystem path. Both dialogs
+    // require the current owned main frame and an explicit user selection.
+    func webView(_ browser: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping ([URL]?) -> Void) {
+        let origin = frame.securityOrigin
+        guard PanelRecoveryPolicy.trustsMessage(currentView: browser === webView,
+                mainFrame: frame.isMainFrame, scheme: origin.protocol, host: origin.host,
+                port: origin.port, frameURL: frame.request.url, activePort: activePort),
+              !fileDialogActive else { completionHandler(nil); return }
+        fileDialogActive = true
+        let generation = pageGeneration
+        let panel = NSOpenPanel()
+        panel.title = "Import HopHarbor configuration"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedFileTypes = ["json"]
+        panel.beginSheetModal(for: window) { [weak self, weak browser] result in
+            guard let self = self else { completionHandler(nil); return }
+            self.fileDialogActive = false
+            guard result == .OK, let url = panel.url, generation == self.pageGeneration,
+                  browser === self.webView,
+                  let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  (attributes[.type] as? FileAttributeType) == .typeRegular,
+                  let size = attributes[.size] as? NSNumber, size.intValue <= 262_144 else {
+                completionHandler(nil); return
+            }
+            completionHandler([url])
+        }
+    }
+
+    private func exportConfiguration(_ data: Data, browser: WKWebView) {
+        fileDialogActive = true
+        let generation = pageGeneration
+        let panel = NSSavePanel()
+        panel.title = "Export HopHarbor configuration"
+        panel.nameFieldStringValue = "HopHarbor-configuration.json"
+        panel.allowedFileTypes = ["json"]
+        panel.canCreateDirectories = true
+        panel.beginSheetModal(for: window) { [weak self, weak browser] result in
+            guard let self = self else { return }
+            self.fileDialogActive = false
+            guard generation == self.pageGeneration, let browser = browser,
+                  browser === self.webView else { return }
+            var status = "cancelled"
+            if result == .OK, let url = panel.url {
+                do {
+                    try data.write(to: url, options: .atomic)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+                    status = "saved"
+                } catch { status = "error" }
+            }
+            // Only fixed status strings enter JavaScript; file paths never do.
+            browser.evaluateJavaScript("window.dispatchEvent(new CustomEvent('hopharbor-file-result',{detail:{status:'" + status + "'}}))", completionHandler: nil)
         }
     }
 
@@ -398,7 +466,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             return
         }
         if navigationAction.navigationType == .linkActivated,
-           url.absoluteString == "https://github.com/kiyanibehzad/HopHarbor" {
+           (url.absoluteString == "https://github.com/kiyanibehzad/HopHarbor" ||
+            url.absoluteString == "https://github.com/kiyanibehzad/HopHarbor/releases" ||
+            url.absoluteString.range(of: "^https://github\\.com/kiyanibehzad/HopHarbor/releases/tag/v?[0-9]+\\.[0-9]+\\.[0-9]+$", options: .regularExpression) != nil) {
             NSWorkspace.shared.open(url)
             decisionHandler(.cancel)
             return

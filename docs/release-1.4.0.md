@@ -1,0 +1,20 @@
+# HopHarbor 1.4.0 · build 13 — macOS source testing prerelease
+
+The macOS-only source prerelease `v1.4.0-preview.1` opens a short user-testing cycle on Apple Silicon macOS 13 or later. It is a prerelease, not the Latest stable release. Ubuntu and Windows installers remain at **1.3.2 / build 12**; no 1.4.0 package or deployment is supplied for them. Shared source metadata is synchronized to 1.4.0 / build 13 for the future common version scheme, but does not establish validation or a release for those platforms. Existing tags and assets are preserved.
+
+[Download and build this exact Mac prerelease](macos-preview-1.4.0.md).
+
+The candidate adds authenticated SSH Sessions without forwarding, scoped Connect All and Reconnect All, explicit continuity verification when editing a trusted endpoint, portable configuration merge with native Mac open/save dialogs, advisory official-release notices, Firewall routes and dependency-first scheduling, and a compact three-state appearance button.
+
+Changed trusted endpoints require a short-lived proof ticket or a manually supplied trusted host key before Save. The proof uses the saved Session's authentication and Firewall chain, strict host verification and a single previously trusted key; RSA proofs use SHA-2 algorithms. Editing routing or authentication invalidates a proof. A first Session may still be saved before host trust is supplied.
+
+Session-only readiness requires a successful OpenSSH master check for the owned process after authentication. No local TCP listener or remote shell is required. Per-forward SSH pools and private jump processes remain independent. Bulk reconnect selects desired-active entries; intentionally stopped entries remain stopped. Stop generations prevent queued reconnects from reviving an explicitly stopped item. Firewall roles precede other requested work; parent-before-child order is shared by autostart, bulk and retry/wake scheduling. None of this starts an upstream forwarding entry that was not requested.
+
+Configuration JSON schema 1 carries Sessions, Firewall references, forwarding, pools, keepalive and portable settings. It excludes passwords, passphrases, private keys, local identity paths, host trust, tokens, cookies, logs and process state. Import validates before showing a preview, remaps new IDs, merges without overwriting existing records, disables imported autostart, and requires local key setup throughout imported jump chains. Reimport is idempotent; a no-op does not rewrite the private rollback backup. Undo is available while configuration is unchanged and imported entries are disconnected.
+
+Release checks use only bounded official GitHub metadata requests in a background worker. Cache lifetime is 24 hours, manual checks are throttled, versions compare numerically and network/invalid-response failures are unknown rather than up-to-date. No asset download, code execution or installer action is present. The default sidebar shows only service status; About and updates opens from that row. A genuinely newer stable release opens a small notice once at the first visible, non-modal opportunity without moving focus. Acknowledgement survives panel refresh and reopen; equal, older and unavailable results remain silent.
+
+Local validation includes the full unit suite, native WKWebView authentication/appearance and file-dialog checks, loopback OpenSSH/GOST pools and TLS with a private test CA, ED25519 and RSA continuity/authentication failures, owned proof shutdown, shared-deadline wake and 25-process bulk stress, and concurrent Stop cancellation. The private Preview has additional loopback/key/port guards and never accesses the system credential store; those harness restrictions are not production behavior. Private logs, keys, screenshots and installed app archives are not public release artifacts.
+
+
+Validation applies to the tested local Mac and synthetic fixtures. Real physical sleep/network transitions, every remote SSH policy, and Ubuntu/Windows 1.4.0 runtime behavior are not established by these checks. The app is built locally with an ad-hoc signature, not an Apple-notarized binary distribution.

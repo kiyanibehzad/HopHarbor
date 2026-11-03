@@ -29,6 +29,8 @@ class Fixture:
         self.token = secrets.token_urlsafe(32)
         self.sessions = set()
         self.always_unauthorized = False
+        self.release_checks = 0
+        self.release = {"status": "older", "latest_version": "1.3.2", "url": "https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2"}
         self.logins = 0
         self.rejected_bootstraps = 0
         self.frame_requests = {}
@@ -44,7 +46,7 @@ class Fixture:
 
     def stats(self):
         return {'logins': self.logins, 'rejected_bootstraps': self.rejected_bootstraps,
-                'frame_requests': dict(self.frame_requests)}
+                'frame_requests': dict(self.frame_requests), 'release_checks': self.release_checks}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -101,8 +103,10 @@ class Handler(BaseHTTPRequestHandler):
                 valid = not f.always_unauthorized and session is not None and session.value in f.sessions
             if not valid:
                 return self.reply(401, {'error': 'Panel authentication is required. Reopen the app.'})
-            return self.reply(200, {'servers': [], 'tunnels': [], 'logs': [],
-                'service': {'platform': 'darwin', 'version': 'synthetic', 'build': 0}, 'migration': {}})
+            return self.reply(200, {'servers': [
+                {'id':'sample_firewall','name':'Sample Firewall','host':'192.0.2.10','port':22,'username':'demo','auth_mode':'agent','jump_id':None,'dependent_session_count':1},
+                {'id':'sample_child','name':'Sample Session','host':'192.0.2.20','port':22,'username':'demo','auth_mode':'agent','jump_id':'sample_firewall','firewall_path':['sample_firewall']}], 'tunnels': [], 'logs': [],
+                'service': {'platform': 'darwin', 'version': 'synthetic', 'build': 0, 'release': f.release}, 'migration': {}})
         path = self.path.split('?', 1)[0]
         if path in ('/', '/index.html', '/app.js'):
             name = 'app.js' if path == '/app.js' else 'index.html'
@@ -136,6 +140,25 @@ class Handler(BaseHTTPRequestHandler):
                 f.logins += 1
                 return self.reply(200, {'ok': True}, headers={'Set-Cookie':
                     'pm_session=' + session + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200'})
+            if self.path == '/api/release/check':
+                cookie = SimpleCookie(self.headers.get('Cookie', ''))
+                session = cookie.get('pm_session')
+                if (not session or session.value not in f.sessions
+                        or self.headers.get('Origin') != 'http://127.0.0.1:' + str(f.port)
+                        or self.headers.get('X-Requested-With') != 'ProxyManager'):
+                    return self.reply(403, {'error': 'Fixture authorization required.'})
+                f.release_checks += 1
+                f.release = {'status': 'available', 'latest_version': '9.0.0',
+                             'url': 'https://github.com/kiyanibehzad/HopHarbor/releases/tag/v9.0.0',
+                             'checking': False}
+                return self.reply(200, f.release)
+            if self.path == '/fixture/release':
+                status=body.get('status','unchecked')
+                version=body.get('version','1.3.2')
+                f.release={'status':status,'latest_version':version,
+                           'url':'https://github.com/kiyanibehzad/HopHarbor/releases/tag/v'+version,
+                           'checking':False}
+                return self.reply(200, f.stats())
             if self.path == '/fixture/invalidate':
                 f.sessions.clear()
             elif self.path == '/fixture/control-token':
@@ -201,7 +224,8 @@ def main():
             info = {'CFBundleExecutable': executable.name,
                 'CFBundleIdentifier': 'local.hopharbor.panel-auth-test.' + uuid.uuid4().hex,
                 'CFBundleName': 'HopHarbor Panel Test', 'CFBundlePackageType': 'APPL',
-                'CFBundleShortVersionString': '0.0.0', 'CFBundleVersion': '0',
+                'CFBundleShortVersionString': plistlib.loads((ROOT / 'packaging/Info.plist').read_bytes())['CFBundleShortVersionString'],
+                'CFBundleVersion': plistlib.loads((ROOT / 'packaging/Info.plist').read_bytes())['CFBundleVersion'],
                 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
                 'HopHarborDataDirectory': str(data),
                 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}

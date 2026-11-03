@@ -17,6 +17,7 @@ class Element {
     this.textContent = '';
     this.children = [];
     this.listeners = new Map();
+    this.attributes = new Map();
     const classes = new Set();
     this.classList = {
       add: name => classes.add(name),
@@ -26,8 +27,9 @@ class Element {
   }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
-  setAttribute() {}
-  removeAttribute() {}
+  setAttribute(key,value) { this.attributes.set(key,String(value)); }
+  getAttribute(key) { return this.attributes.get(key) ?? null; }
+  removeAttribute(key) { this.attributes.delete(key); }
   querySelectorAll() { return []; }
   addEventListener(type, callback) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);

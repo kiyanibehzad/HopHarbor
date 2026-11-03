@@ -150,6 +150,32 @@ class FastWakeTests(unittest.TestCase):
             self.assertEqual(child.generation, 3)
             self.assertTrue(path.exists())
 
+    def test_standalone_wake_uses_one_shared_stop_deadline_and_preserves_failed_ownership(self):
+        children=[self.child(term='hang',kill='hang') for _ in range(3)]
+        paths=[self.ownership(c) for c in children]
+        self.manager.session_runtime={str(i):dict(child=c,path=self.manager.data/('socket-'+str(i)),
+                  directory=mock.Mock(),status='connected') for i,c in enumerate(children)}
+        self.manager.recover_after_wake()
+        self.assertAlmostEqual(self.clock.value-100,2.5)
+        self.assertEqual(len([e for e in self.events if e[0]=='signal' and e[2]==signal.SIGTERM]),3)
+        self.assertEqual(len([e for e in self.events if e[0]=='signal' and e[2]==signal.SIGKILL]),3)
+        for child,path in zip(children,paths):
+            self.assertIsNotNone(child.proc)
+            self.assertTrue(path.exists())
+        # State acquires the lock immediately after the single bounded batch.
+        self.assertTrue(self.manager.lock.acquire(blocking=False))
+        self.manager.lock.release()
+
+    def test_standalone_batch_disconnect_has_shared_deadlines_and_cleans_only_successes(self):
+        children=[self.child(term='hang',kill='exit') for _ in range(3)]
+        records={str(i):dict(child=c,path=self.manager.data/('socket-'+str(i)),
+                 directory=mock.Mock(),status='connected') for i,c in enumerate(children)}
+        self.manager.session_runtime=records
+        self.manager.stop_session_transports(list(records))
+        self.assertAlmostEqual(self.clock.value-100,.5)
+        self.assertFalse(self.manager.session_runtime)
+        self.assertTrue(all(c.proc is None for c in children))
+
     def test_signal_and_wait_failures_preserve_the_failed_children_but_finish_siblings(self):
         children = [self.child(term='error'), self.child(term='hang', kill='error'),
                     self.child(term='wait_error'), self.child()]
