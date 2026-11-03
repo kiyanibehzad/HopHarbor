@@ -1,5 +1,7 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
+**پیش‌انتشار آزمایشی مک:** [سورس و نصب 1.4.0، بیلد 13](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.0-preview.1/docs/macos-preview-1.4.0.md) · [صفحهٔ پیش‌انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.0-preview.1). stable همچنان **1.3.2، بیلد 12** است؛ به‌روزرسانی اوبونتو و ویندوز جداگانه دنبال می‌شود.
+
 مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
 
 [English guide](README.md) · [دانلود و انتشارها](https://github.com/kiyanibehzad/HopHarbor/releases/latest)

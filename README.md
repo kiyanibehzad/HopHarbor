@@ -1,5 +1,7 @@
 # HopHarbor
 
+**macOS testing prerelease:** [1.4.0 · build 13 source and installation](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.0-preview.1/docs/macos-preview-1.4.0.md) · [prerelease](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.0-preview.1). Stable remains **1.3.2 · build 12**; Ubuntu and Windows updates will follow separately.
+
 A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
 [فارسی: راهنمای نصب و استفاده](README.fa.md) · [Downloads and releases](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
