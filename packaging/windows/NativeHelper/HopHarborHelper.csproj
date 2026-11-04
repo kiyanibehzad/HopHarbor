@@ -8,9 +8,9 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <AssemblyName>HopHarborHelper</AssemblyName>
     <RootNamespace>HopHarbor.NativeHelper</RootNamespace>
-    <Version>1.4.0</Version>
-    <FileVersion>1.4.0.13</FileVersion>
-    <AssemblyVersion>1.4.0.13</AssemblyVersion>
+    <Version>1.4.1</Version>
+    <FileVersion>1.4.1.14</FileVersion>
+    <AssemblyVersion>1.4.1.14</AssemblyVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

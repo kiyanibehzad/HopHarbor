@@ -21,8 +21,8 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '1.4.0'
-BUILD = 13
+VERSION = '1.4.1'
+BUILD = 14
 SDK_VERSION = '10.0.403'
 PYTHON_VERSION = '3.14.9'
 WEBVIEW_VERSION = '1.0.4314.35'

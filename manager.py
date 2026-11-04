@@ -32,11 +32,11 @@ else:
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
 from session_tools import SessionTools
-from configuration_portability import ConfigurationTools
+from configuration_portability import ConfigurationTools, normalize_color
 from release_check import ReleaseChecker
 
-VERSION = '1.4.0'
-BUILD = 13
+VERSION = '1.4.1'
+BUILD = 14
 MAC_VERSION = VERSION
 MAC_BUILD = BUILD
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
@@ -661,6 +661,8 @@ class Manager(SessionTools, ConfigurationTools):
             if not ID_RE.fullmatch(s.get('id', '')) or s['id'] in ids:
                 raise ValueError('Invalid session ID.')
             ids.add(s['id'])
+            if 'color' in s:
+                s['color'] = normalize_color(s['color'])
             if not host_ok(s.get('host')) or not USER_RE.fullmatch(s.get('username', '')):
                 raise ValueError('Invalid session hostname or username.')
             s['port'] = integer(s.get('port', 22), 1, 65535, 'Invalid SSH port.')
@@ -1129,6 +1131,21 @@ class Manager(SessionTools, ConfigurationTools):
             existing = next((x for x in items if x['id'] == ident), None) if ident else None
             if ident and not existing:
                 raise KeyError('Item not found.')
+            # Color-only metadata updates are safe while this Session is in use.
+            # Preserve order, SSH configuration, credentials and owned processes.
+            if collection == 'servers' and existing and not delete and set(data) == {'color'}:
+                color = normalize_color(data['color'])
+                if existing.get('color') == color:
+                    return {'ok': True, 'id': ident}
+                existing['color'] = color
+                previous = self.config
+                self.config = current
+                try:
+                    self.save()
+                except Exception:
+                    self.config = previous
+                    raise
+                return {'ok': True, 'id': ident}
             if collection == 'tunnels' and ident in self.runtime:
                 raise ValueError('Stop this port forwarding entry before editing or deleting it.')
             if collection == 'servers' and ident:
@@ -1144,7 +1161,7 @@ class Manager(SessionTools, ConfigurationTools):
                 items.remove(existing)
             if not delete:
                 allowed = {'id', 'name', 'host', 'port', 'username', 'identity_file', 'jump_id', 'auth_mode',
-                           'keepalive_interval', 'keepalive_count'} if collection == 'servers' else {
+                           'keepalive_interval', 'keepalive_count', 'color'} if collection == 'servers' else {
                     'id', 'name', 'server_id', 'kind', 'local_port', 'remote_host', 'remote_port', 'pool_size', 'autostart', 'probe_type'}
                 record = dict(existing or {})
                 record.update({k: v for k, v in data.items() if k in allowed})

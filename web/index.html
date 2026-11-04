@@ -125,15 +125,78 @@ dialog{border:1px solid #dce6e8;border-radius:13px;box-shadow:0 22px 90px #16313
 @media(max-width:580px){.forwarding-group-head{padding:12px;align-items:flex-start;gap:10px}.forwarding-group-title{gap:3px 8px}.forwarding-group-title h2{font-size:12px}.forwarding-group-head>.text-button{font-size:10px}.forwarding-group-summary>.server-symbol{display:none}.group-count,.group-route{font-size:9px}}
 
 
-.session-statusbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-top:14px}
-.session-indicators{display:flex;align-items:flex-start;gap:5px;flex-wrap:wrap}.session-counts{font-size:10px;color:var(--subtle);text-align:right;line-height:1.7}
+.server-card{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:subgrid;grid-row:span 6;row-gap:0;min-width:0}
+.server-card-head{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:6px 10px;align-items:center;align-content:start}
+.server-card-head .secondary-text{margin-top:1px;line-height:15px}
+.server-card-head .session-heading{display:flex;align-items:stretch;gap:6px;min-width:0}
+.session-name-block{flex:1;min-width:0}
+.session-title{display:flex;align-items:center;gap:6px;min-width:0;min-height:22px}
+.session-color-marker{display:inline-grid;place-items:stretch center;align-self:stretch;flex:0 0 14px;width:14px;border:0;padding:0;background:transparent;border-radius:3px}
+.session-color-line{display:block;width:3px;height:100%;border-radius:2px}
+.session-color-marker:hover{background:var(--accent-soft)}
+.session-color-marker:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.forwarding-group-info{display:flex;align-items:stretch;gap:6px}
+.forwarding-group-text{min-width:0;flex:1}
+.session-name-editor{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:10px}
+#serverColor{height:35px;min-width:0;padding:3px;cursor:pointer}
+.color-palette{display:flex;flex-wrap:wrap;gap:7px;margin:11px 0}
+.color-swatch{width:24px;height:24px;border:1px solid #0002;border-radius:5px;padding:0}
+.color-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0}
+#sessionColorChoice{width:42px;height:30px;padding:2px;border:1px solid var(--line);border-radius:5px;background:var(--paper)}
+.session-title .primary-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.server-card-details{grid-row:span 2;grid-template-rows:subgrid;row-gap:12px;min-width:0}
+.server-card-details>div{min-width:0}
+.session-statusbar{margin-top:12px}
+.session-counts{display:flex;flex-wrap:wrap;align-items:center;gap:3px 12px;font-size:10px;color:var(--subtle);line-height:1.6;overflow-wrap:anywhere}
+.session-status-symbol{position:relative;width:36px;align-self:center}
+.session-status-icon{width:36px;height:36px}
+.session-status-icon svg{width:18px;height:18px}
+.session-status-icon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.server-symbol.session-status-icon.status-connected{color:#397e59;background:#e8f4ed}
+.server-symbol.session-status-icon.status-starting,.server-symbol.session-status-icon.status-degraded{color:var(--amber);background:var(--amber-soft)}
+.server-symbol.session-status-icon.status-error{color:var(--red);background:var(--red-soft)}
+.server-symbol.session-status-icon.status-firewall{color:var(--accent);background:var(--accent-soft)}
+.server-symbol.session-status-icon.status-stopped{color:var(--subtle);background:var(--canvas)}
+:root[data-theme="dark"] .server-symbol.session-status-icon.status-connected{color:#94d5aa;background:#25312a}
+.session-status-tooltip{display:none;position:absolute;left:0;top:calc(100% + 7px);z-index:25;width:max-content;max-width:min(250px,calc(100vw - 30px));padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);box-shadow:0 4px 14px #0002;font-size:10px;line-height:1.6;pointer-events:none}
+.session-status-symbol:hover .session-status-tooltip,.session-status-symbol:focus-within .session-status-tooltip{display:block}
 .session-actions{display:flex;align-items:center;gap:6px;margin-top:15px;padding-top:12px;border-top:1px solid var(--line)}
 .session-actions .button{flex:1;padding-left:6px;padding-right:6px}.session-actions .button svg{width:12px;height:12px}
 .session-control-note{font-size:10px;color:var(--subtle);line-height:1.6;margin:8px 0 0}.session-error{font-size:10px;color:var(--red);line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
-.firewall-badge{border:1px solid var(--line);background:transparent;color:var(--muted)}
+.firewall-indicator{flex-shrink:0;padding:2px 7px;border:1px solid var(--line);border-radius:5px;color:var(--muted);background:transparent;font-size:10px;font-weight:650;line-height:1.6;white-space:nowrap}
+.firewall-indicator.in-use{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.firewall-indicator:hover,.firewall-indicator[aria-expanded="true"]{background:var(--accent-soft);color:var(--accent)}
+.firewall-indicator:focus-visible,.popover-heading button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.context-popover{position:fixed;z-index:35;width:292px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;padding:13px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);box-shadow:0 8px 28px #0002;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.context-popover[hidden]{display:none}
+.context-popover:focus{outline:none}
+.popover-heading{display:flex;align-items:start;justify-content:space-between;gap:8px;font-weight:650}
+.popover-heading .icon-button{flex:0 0 22px;width:22px;height:22px;color:var(--subtle)}
+.popover-heading svg{width:12px;height:12px}
+.context-popover p{margin:8px 0 0;color:var(--muted)}
+.context-popover .popover-note{border-top:1px solid var(--line);padding-top:9px;font-size:10px}
+.dependent-group{margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
+.dependent-group h3{margin:0 0 5px;font-size:10px;font-weight:600;color:var(--muted)}
+.dependent-list{list-style:none;margin:0;padding:0}
+.dependent-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;padding:5px 0}
+.dependent-name{overflow-wrap:anywhere}
+.dependent-state{font-size:10px;color:var(--muted);white-space:nowrap}
+.dependent-state.connected,.dependent-state.firewall{color:var(--accent)}
+.dependent-state.starting,.dependent-state.degraded{color:var(--amber)}
+.dependent-state.error{color:var(--red)}
+.tools-menu{width:230px;padding:5px}
+.tools-menu button{display:block;width:100%;padding:9px 10px;border:0;border-radius:5px;text-align:left;background:transparent;color:var(--ink);font-size:11px;line-height:1.5}
+.tools-menu button:hover{background:var(--accent-soft)}
+.tools-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;background:var(--accent-soft)}
+.tools-menu button[hidden]{display:none}
+.tools-toggle:focus-visible{outline:2px solid #93d9d0;outline-offset:-2px}
+.tools-toggle[aria-expanded="true"]{background:#20383e;color:#e2f0ed}
+:root[data-theme="dark"] .tools-toggle[aria-expanded="true"]{background:#252529;color:#dddde3}
 .connection-settings-title{font-size:11px;font-weight:600;color:var(--ink);margin:14px 0 12px}.connection-settings-help{font-size:10px;line-height:1.7;color:var(--subtle);margin:12px 0 0}
-:root[data-theme="dark"] .firewall-badge{background:transparent;color:#bdbdc7;border-color:#42424a}
 @media(max-width:580px){.session-statusbar{gap:8px}.session-counts{font-size:9px}.session-actions{gap:5px}.session-actions .button{font-size:10px}}
+@media(max-width:380px){.session-actions .button svg{display:none}}
+@media(max-width:1040px){.server-grid{grid-template-columns:1fr}}
+@media(max-width:380px){.server-card-head{grid-template-columns:36px minmax(0,1fr)}.server-card-tools{grid-column:2;justify-self:end}}
 
 .migration-note>div{flex:1;min-width:0}.migration-dismiss{margin-left:auto;flex:0 0 auto;width:26px;height:26px}
 .log-retention-help{margin:-3px 0 13px;color:var(--subtle);font-size:10px;line-height:1.7}.log-repeat{margin-left:8px;padding:1px 5px;vertical-align:baseline;font-size:9px;font-variant-numeric:tabular-nums}.activity-text .log-repeat{font-size:9px}
@@ -198,8 +261,9 @@ dialog{border:1px solid #dce6e8;border-radius:13px;box-shadow:0 22px 90px #16313
 <button class="nav-button" data-view="tunnels" title="Port Forwarding" aria-label="Port Forwarding"><span data-icon="tunnel"></span><span class="nav-text">Port Forwarding</span><span class="nav-count" id="navTunnelCount">0</span></button>
 <button class="nav-button" data-view="servers" title="Sessions" aria-label="Sessions"><span data-icon="server"></span><span class="nav-text">Sessions</span></button>
 <button class="nav-button" data-view="logs" title="Logs" aria-label="Logs"><span data-icon="logs"></span><span class="nav-text">Logs</span></button>
+<button class="nav-button tools-toggle" id="toolsToggle" type="button" title="Tools" aria-label="Tools" aria-expanded="false" aria-controls="toolsMenu"><span data-icon="tools"></span><span class="nav-text">Tools</span></button>
 </nav>
-<div class="sidebar-bottom"><div class="sidebar-updates" id="updatesPanel"><button class="updates-toggle" id="updatesToggle" type="button" aria-label="Connecting to local service. About and updates" title="About and updates" aria-expanded="false" aria-controls="updatesContent"><span class="service-summary"><span class="status-dot" id="serviceDot" aria-hidden="true"></span><span id="serviceLabel" title="Connecting to local service">Connecting</span></span><span class="version-summary"><span class="update-notice" id="updateNotice" hidden aria-hidden="true">↑</span><span class="updates-chevron" data-icon="chevron"></span></span></button><div class="updates-content" id="updatesContent" role="region" aria-label="About and updates"><div class="updates-version-row"><span id="appVersion" title="HopHarbor version">v1.4.0 &middot; build 13</span><button class="icon-button updates-close" id="updatesClose" type="button" title="Close About and updates" aria-label="Close About and updates"><span data-icon="close"></span></button></div><p class="updates-status" id="releaseStatus" role="status" aria-live="polite">Release information has not been checked.</p><div class="updates-actions"><button class="updates-check" id="checkRelease" type="button">Check for updates</button><a id="releaseLink" href="https://github.com/kiyanibehzad/HopHarbor/releases" rel="noreferrer">Official releases</a></div><p class="updates-local-note"><span id="managedDevice">Managed on this Mac.</span> Local access only.</p></div></div></div>
+<div class="sidebar-bottom"><div class="sidebar-updates" id="updatesPanel"><button class="updates-toggle" id="updatesToggle" type="button" aria-label="Connecting to local service. About and updates" title="About and updates" aria-expanded="false" aria-controls="updatesContent"><span class="service-summary"><span class="status-dot" id="serviceDot" aria-hidden="true"></span><span id="serviceLabel" title="Connecting to local service">Connecting</span></span><span class="version-summary"><span class="update-notice" id="updateNotice" hidden aria-hidden="true">↑</span><span class="updates-chevron" data-icon="chevron"></span></span></button><div class="updates-content" id="updatesContent" role="region" aria-label="About and updates"><div class="updates-version-row"><span id="appVersion" title="HopHarbor version">v1.4.1 &middot; build 14</span><button class="icon-button updates-close" id="updatesClose" type="button" title="Close About and updates" aria-label="Close About and updates"><span data-icon="close"></span></button></div><p class="updates-status" id="releaseStatus" role="status" aria-live="polite">Release information has not been checked.</p><div class="updates-actions"><button class="updates-check" id="checkRelease" type="button">Check for updates</button><a id="releaseLink" href="https://github.com/kiyanibehzad/HopHarbor/releases" rel="noreferrer">Official releases</a></div><p class="updates-local-note"><span id="managedDevice">Managed on this Mac.</span> Local access only.</p></div></div></div>
 </aside>
 <main class="main">
 <header class="topbar"><div><div class="eyebrow">Your local workspace</div><h1 id="pageTitle">Overview</h1><p class="subtitle" id="pageSubtitle">A clear view of your SSH connections and forwarding.</p></div><div class="topbar-actions"><button class="icon-button" id="appearanceSelect" type="button" title="Appearance: System. Switch to Light" aria-label="Appearance: System. Switch to Light"><span data-icon="appearance"></span></button><button class="icon-button" id="refreshButton" title="Refresh status" aria-label="Refresh status"><span data-icon="refresh"></span></button><button class="button primary" id="primaryAction"><span data-icon="plus"></span><span id="primaryActionText">New forwarding</span></button></div></header>
@@ -212,12 +276,30 @@ dialog{border:1px solid #dce6e8;border-radius:13px;box-shadow:0 22px 90px #16313
 <div class="active-layout"><section><div class="section-head"><h2>Recent activity</h2><button class="text-button" data-go-view="logs">View logs <span data-icon="arrow"></span></button></div><div class="panel activity-list" id="recentActivity"></div></section><aside class="guide-panel"><span class="guide-symbol" data-icon="shield"></span><h3 class="guide-title">Keep your connections running</h3><p class="guide-copy">Forwarding runs in the background. You can close this window and keep your active connections.</p><div class="guide-footer"><span data-icon="lock"></span><span id="privateDevice">Private access on this Mac</span></div></aside></div>
 </section>
 <section class="view" id="view-tunnels" hidden aria-label="Port Forwarding"><div class="toolbar"><label class="search-field"><span data-icon="search"></span><input type="search" id="tunnelSearch" placeholder="Search forwarding, session or port..." aria-label="Search port forwarding"></label><div class="filter-buttons" role="group" aria-label="Connection status"><button class="filter-button active" data-filter="all" aria-pressed="true">All</button><button class="filter-button" data-filter="running" aria-pressed="false">Active</button><button class="filter-button" data-filter="stopped" aria-pressed="false">Disconnected</button></div></div><div class="row-actions"><button class="button small" data-bulk-scope="tunnels" data-bulk-action="connect">Connect All</button><button class="button small" data-bulk-scope="tunnels" data-bulk-action="reconnect">Reconnect All</button></div><div class="forwarding-groups" id="allTunnels"></div></section>
-<section class="view" id="view-servers" hidden aria-label="Sessions"><div class="section-head"><div><h2>Saved sessions</h2><p>SSH connection settings and authentication</p></div></div><div class="row-actions"><button class="button small" data-bulk-scope="servers" data-bulk-action="connect">Connect All</button><button class="button small" data-bulk-scope="servers" data-bulk-action="reconnect">Reconnect All</button><button class="button small" id="importConfig">Import…</button><button class="button small" id="exportConfig">Export…</button><button class="button small" id="undoImport" hidden>Undo last import</button><input id="configFile" type="file" accept=".json,application/json" hidden></div><div class="server-grid" id="serverGrid"></div></section>
+<section class="view" id="view-servers" hidden aria-label="Sessions"><div class="section-head"><div><h2>Saved sessions</h2><p>SSH connection settings and authentication</p></div></div><div class="row-actions"><button class="button small" data-bulk-scope="servers" data-bulk-action="connect">Connect All</button><button class="button small" data-bulk-scope="servers" data-bulk-action="reconnect">Reconnect All</button></div><div class="server-grid" id="serverGrid"></div></section>
 <section class="view" id="view-logs" hidden aria-label="Logs"><div class="toolbar"><label class="search-field"><span data-icon="search"></span><input type="search" id="logSearch" placeholder="Search activity and errors..." aria-label="Search logs"></label><div class="status-note"><span data-icon="clock"></span><span title="Current local calendar day; newest events first">Today only &middot; Latest 200 events</span></div></div><p class="log-retention-help">Diagnostics may include addresses. No traffic or access logging.</p><div class="panel logs-list" id="logsList"></div></section>
 <footer class="page-foot"><div class="status-update"><span class="status-dot" id="footerDot"></span><span id="lastUpdated">Loading status...</span></div><div class="footer-meta"><a href="https://github.com/kiyanibehzad/HopHarbor" rel="noreferrer">Built by Behzad Kiyani with Codex</a></div></footer>
 </main></div>
+<div class="context-popover tools-menu" id="toolsMenu" role="region" aria-label="Configuration tools" hidden>
+<button id="importConfig" type="button">Import configuration…</button>
+<button id="exportConfig" type="button">Export configuration…</button>
+<button id="undoImport" type="button" hidden>Undo last import</button>
+</div>
+<input id="configFile" type="file" accept=".json,application/json" hidden>
+<div class="context-popover" id="sessionColorPanel" role="region" aria-labelledby="sessionColorTitle" tabindex="-1" hidden>
+<div class="popover-heading"><span id="sessionColorTitle">Session color</span><button class="icon-button" id="sessionColorClose" type="button" aria-label="Close Color" title="Close Color"><span data-icon="close"></span></button></div>
+<div class="color-palette" id="sessionColorPalette" role="group" aria-label="Color palette"></div>
+<div class="color-choice"><label for="sessionColorChoice">Color</label><input type="color" id="sessionColorChoice" value="#58a6a6"></div>
+<div id="sessionColorError" class="form-error" role="alert"></div><button class="button small soft" id="applySessionColor" type="button">Save color</button>
+<p class="popover-note">Session color identifies this session. The server icon shows live status.</p>
+</div>
+<div class="context-popover" id="firewallDetails" role="region" aria-labelledby="firewallDetailsTitle" tabindex="-1" hidden>
+<div class="popover-heading"><span id="firewallDetailsTitle">Firewall</span><button class="icon-button" id="firewallDetailsClose" type="button" aria-label="Close Firewall details" title="Close Firewall details"><span data-icon="close"></span></button></div>
+<p id="firewallDetailsCopy"></p><p id="firewallDetailsRoute"></p><div id="firewallDependents"></div>
+<p class="popover-note">Session controls affect this session’s own connections. Other sessions using it as a Firewall keep running.</p>
+</div>
 <dialog id="serverDialog" aria-labelledby="serverDialogTitle"><form id="serverForm"><div class="modal-head"><div><h2 id="serverDialogTitle">New session</h2><p>Set up an SSH connection for port forwarding.</p></div><button class="icon-button" type="button" data-close-dialog="serverDialog" aria-label="Close"><span data-icon="close"></span></button></div><div class="modal-body"><div class="form-error" id="serverFormError" role="alert"></div><input type="hidden" name="id"><div class="form-grid">
-<div class="field full"><label for="serverName">Session Name</label><input id="serverName" name="name" required maxlength="80" placeholder="e.g. London" autocomplete="off"></div>
+<div class="field full session-name-editor"><div class="field"><label for="serverName">Session Name</label><input id="serverName" name="name" required maxlength="80" placeholder="e.g. London" autocomplete="off"></div><div class="field"><label for="serverColor">Color</label><input type="color" id="serverColor" name="color" value="#58a6a6"></div></div>
 <div class="field"><label for="serverHost">Hostname</label><input id="serverHost" name="host" required maxlength="253" placeholder="server.example.com" autocomplete="off" spellcheck="false"></div>
 <div class="field"><label for="serverPort">Port</label><input id="serverPort" type="number" name="port" required min="1" max="65535" value="22"></div>
 <div class="field full" role="status"><small id="hostKeyHelp">Obtain the trusted host public key from the server administrator. This is separate from your login key.</small><button class="button small" type="button" id="verifyEndpoint" hidden>Check new endpoint with previously trusted key</button></div><div class="field"><label for="serverUser">Username</label><input id="serverUser" name="username" required maxlength="64" placeholder="username" autocomplete="off" spellcheck="false"></div>
@@ -244,7 +326,7 @@ dialog{border:1px solid #dce6e8;border-radius:13px;box-shadow:0 22px 90px #16313
 <script>
 'use strict';
 // All dynamic values enter the document through textContent or form.value.
-const ICONS={chevron:'<path d="m8 10 4 4 4-4"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',moon:'<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',appearance:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>',brand:'<path d="M6 5v14M18 5v14M6 13c3-4 9-4 12 0" stroke-width="2.7"/><g fill="currentColor" stroke="none"><circle cx="6" cy="5" r="1.8"/><circle cx="6" cy="19" r="1.8"/><circle cx="18" cy="5" r="1.8"/><circle cx="18" cy="19" r="1.8"/></g>',dashboard:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',tunnel:'<path d="M4 7h16m-4-4 4 4-4 4M20 17H4l4-4m-4 4 4 4"/>',server:'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5M12 17.5h5"/>',logs:'<path d="M8 3h8l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3Z"/><path d="M15 3v5h5M8 12h8M8 16h6"/>',plus:'<path d="M12 5v14M5 12h14"/>',refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-2L20 8M4 16l2.4 3A7 7 0 0 0 18 17"/>',pulse:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',warning:'<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v4m0 4h.01"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',edit:'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',play:'<path d="m8 4 12 8-12 8V4Z"/>',stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',check:'<path d="m5 12 4 4L19 6"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z"/>',key:'<circle cx="8" cy="9" r="4"/><path d="m11 12 9 9m-3-6-3 3m0-6-3 3"/>'};
+const ICONS={tools:'<path d="M4 7h2m6 0h8M4 17h8m6 0h2"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',chevron:'<path d="m8 10 4 4 4-4"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',moon:'<path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/>',appearance:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>',brand:'<path d="M6 5v14M18 5v14M6 13c3-4 9-4 12 0" stroke-width="2.7"/><g fill="currentColor" stroke="none"><circle cx="6" cy="5" r="1.8"/><circle cx="6" cy="19" r="1.8"/><circle cx="18" cy="5" r="1.8"/><circle cx="18" cy="19" r="1.8"/></g>',dashboard:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',tunnel:'<path d="M4 7h16m-4-4 4 4-4 4M20 17H4l4-4m-4 4 4 4"/>',server:'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5M12 17.5h5"/>',logs:'<path d="M8 3h8l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3Z"/><path d="M15 3v5h5M8 12h8M8 16h6"/>',plus:'<path d="M12 5v14M5 12h14"/>',refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-2L20 8M4 16l2.4 3A7 7 0 0 0 18 17"/>',pulse:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',warning:'<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v4m0 4h.01"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',edit:'<path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',play:'<path d="m8 4 12 8-12 8V4Z"/>',stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',check:'<path d="m5 12 4 4L19 6"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z"/>',key:'<circle cx="8" cy="9" r="4"/><path d="m11 12 9 9m-3-6-3 3m0-6-3 3"/>'};
 function icon(name){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','1.6');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[name]||ICONS.tunnel;return s}
 document.querySelectorAll('[data-icon]').forEach(n=>n.replaceChildren(icon(n.dataset.icon)));
 

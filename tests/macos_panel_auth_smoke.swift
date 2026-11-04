@@ -18,6 +18,7 @@ private final class PanelAuthSmokeDriver {
     var frameChecks: [[String: Any]] = []
     var layoutChecks: [[String: Any]] = []
     var noticeChecks: [String] = []
+    var sessionLayoutChecks: [[String: Any]] = []
     var exitCode: Int32 = 1
 
     init(delegate: AppDelegate, fixture: URL, reportURL: URL) {
@@ -48,7 +49,13 @@ private final class PanelAuthSmokeDriver {
         guard let browser = supplied ?? delegate.testingBrowser else {
             throw SmokeFailure(message: "The test panel is absent.")
         }
-        guard let text = try await browser.evaluateJavaScript("JSON.stringify((" + code + "))") as? String,
+        let value: Any?
+        do { value = try await browser.evaluateJavaScript("JSON.stringify((" + code + "))") }
+        catch {
+            let detail=(error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
+            throw SmokeFailure(message:detail ?? error.localizedDescription)
+        }
+        guard let text = value as? String,
               let data = text.data(using: .utf8) else {
             throw SmokeFailure(message: "The test panel returned an unreadable result.")
         }
@@ -96,7 +103,7 @@ private final class PanelAuthSmokeDriver {
 
     func save(ok: Bool, error: String? = nil) throws {
         var report: [String: Any] = ["ok": ok, "checks": checks, "frame_checks": frameChecks,
-            "actual_wkwebview": true, "actual_app_delegate": true, "layout_checks": layoutChecks, "notice_checks": noticeChecks,
+            "actual_wkwebview": true, "actual_app_delegate": true, "layout_checks": layoutChecks, "notice_checks": noticeChecks, "session_layout_checks": sessionLayoutChecks,
             "synthetic_loopback_only": true, "real_ssh_started": false,
             "actual_system_sleep": false, "forced_renderer_crash": false]
         if let error = error { report["error"] = error }
@@ -200,6 +207,41 @@ private final class PanelAuthSmokeDriver {
         try passed("Centered appearance SVG and sidebar metadata/updates pass all themes, all tabs, 1120/780/320px widths, native click, safe release link and keyboard focus")
     }
 
+    func checkSessionCardsAndTools() async throws {
+        guard let window = NSApp.windows.first(where: { $0.title == "HopHarbor — isolated panel test" }) else {
+            throw SmokeFailure(message: "Isolated layout window missing.")
+        }
+        let frame=window.frame, minimum=window.minSize
+        defer { window.minSize=minimum;window.setFrame(frame,display:true) }
+        window.minSize=NSSize(width:320,height:480)
+        for width in [1440,1120,900,780,580,320] {
+            window.setContentSize(NSSize(width:width,height:900))
+            try await pause(0.1)
+            for mode in ["system","light","dark"] {
+                _ = try await evaluate("(changeAppearance('"+mode+"'),true)")
+                for longText in [false,true] {
+                    window.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps:true)
+                    let geometryOnly=ProcessInfo.processInfo.environment["HOPHARBOR_TEST_GEOMETRY_ONLY"] ?? "false"
+                    let result = try await evaluate("checkSessionLayout("+(longText ? "true":"false")+","+geometryOnly+")") as? [String:Any] ?? [:]
+                    try require(result["firewallAndTools"] as? Bool == true,"Session layout checks did not complete.")
+                    sessionLayoutChecks.append(result)
+                    if mode=="dark" && !longText && [1120,780,320].contains(width) {
+                        _ = try await evaluate("(goView('servers'),true)")
+                        try await saveLayoutSnapshot("cards-"+String(width))
+                        _ = try await evaluate("(document.querySelector('.firewall-indicator').click(),true)")
+                        try await saveLayoutSnapshot("firewall-"+String(width))
+                        _ = try await evaluate("(closePopover(),document.getElementById('toolsToggle').click(),true)")
+                        try await saveLayoutSnapshot("tools-"+String(width))
+                        _ = try await evaluate("(closePopover(),true)")
+                    }
+                }
+            }
+        }
+        _ = try await evaluate("(changeAppearance('system'),goView('dashboard'),true)")
+        try passed("Firewall and normal cards share natural row geometry; Tools and Firewall disclosures preserve focus and viewport bounds in all tabs/themes at six widths")
+    }
+
     func releaseFixture(_ status:String,_ version:String) async throws {
         _ = try await fixtureCall("release",body:["status":status,"version":version])
         _ = try await evaluate("(refresh(true),true)")
@@ -267,6 +309,21 @@ private final class PanelAuthSmokeDriver {
         noticeChecks.append("native hidden panel waits for reopen; the same release does not reopen again")
         try await releaseFixture("older","1.3.2")
         _ = try await evaluate("(closeUpdates(),true)")
+        for (kind,version) in [("tools","1.8.0"),("firewall","1.9.0")] {
+            _ = try await evaluate("(goView('servers'),document.getElementById('"+(kind=="tools" ? "toolsToggle":"firewall-info-sample_firewall")+"').click(),true)")
+            try await releaseFixture("available",version)
+            let deferred = try await evaluate("activePopover!==null&&document.getElementById('updatesToggle').getAttribute('aria-expanded')==='false'&&(document.activeElement===activePopover.panel||activePopover.panel.contains(document.activeElement))") as? Bool
+            try require(deferred == true,"Release notice interrupted "+kind+" or left focus hidden.")
+            _ = try await evaluate("(closePopover(true),true)")
+            try await wait("release deferred behind "+kind) {
+                try await self.evaluate("document.getElementById('updatesToggle').getAttribute('aria-expanded')==='true'&&releaseNoticeSeen==='"+version+"'") as? Bool == true
+            }
+            let preserved = try await evaluate("document.activeElement.id==='"+(kind=="tools" ? "toolsToggle":"firewall-info-sample_firewall")+"'") as? Bool
+            try require(preserved == true,"Deferred release notice moved focus.")
+            _ = try await evaluate("(closeUpdates(),true)")
+            noticeChecks.append("new release waits behind "+kind+" and appears after close without moving focus")
+        }
+        try await releaseFixture("older","1.3.2")
         try passed("Release notices are numeric, quiet by default, modal/visibility-aware, focus-preserving and persistent once per release")
     }
 
@@ -274,6 +331,10 @@ private final class PanelAuthSmokeDriver {
         do {
             delegate.testingNameWindow()
             try await waitOnline()
+            if ProcessInfo.processInfo.environment["HOPHARBOR_TEST_SESSION_LAYOUT_ONLY"] == "1" {
+                try await checkSessionCardsAndTools()
+                exitCode=0;try save(ok:true);delegate.testingQuit();return
+            }
             try passed("Actual AppDelegate and WKWebView bootstrap authenticate and remove the token fragment")
 
             // Exercise the real WKWebView, including the existing preference key.
@@ -305,6 +366,7 @@ private final class PanelAuthSmokeDriver {
 
             try await checkUpdatesLayout()
             try await checkReleaseNotices()
+            try await checkSessionCardsAndTools()
 
             let start = delegate.testingGeneration
             for name in ["direct", "parent-native", "parent-wrapper"] {

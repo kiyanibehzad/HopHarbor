@@ -8,11 +8,29 @@ import time
 import uuid
 
 SESSION = {'id', 'name', 'host', 'port', 'username', 'jump_id', 'auth_mode',
-           'keepalive_interval', 'keepalive_count', 'identity_required'}
+           'keepalive_interval', 'keepalive_count', 'identity_required', 'color'}
 FORWARD = {'id', 'name', 'server_id', 'kind', 'local_port', 'remote_host', 'remote_port',
            'pool_size', 'autostart', 'probe_type'}
 FORMAT = 'HopHarbor configuration'
 LIMIT = 262144
+SESSION_COLORS = ('#58A6A6', '#A28BCB', '#D9A25F', '#76A978', '#7D9DD3', '#C67E9B', '#D38B75', '#98A5B3')
+
+
+def normalize_color(value):
+    if not isinstance(value, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', value):
+        raise ValueError('Session color must be a six-digit hexadecimal color such as #58A6A6.')
+    return value.upper()
+
+
+def session_color(server):
+    if 'color' in server:
+        return normalize_color(server['color'])
+    # Match the UI's unsigned FNV-1a hash. Imported legacy records retain their
+    # original ID, so display and portable roundtrips use the same fallback.
+    value = 2166136261
+    for character in str(server.get('portable_id') or server.get('id', '')):
+        value = ((value ^ ord(character)) * 16777619) & 0xffffffff
+    return SESSION_COLORS[value % len(SESSION_COLORS)]
 
 
 def digest(value):
@@ -22,6 +40,7 @@ def digest(value):
 def portable_session(server):
     result = {k: copy.deepcopy(v) for k, v in server.items() if k in SESSION and k != 'identity_required'}
     result['identity_required'] = bool(server.get('identity_file') or server.get('identity_required'))
+    result['color'] = session_color(server)
     return result
 
 
@@ -97,6 +116,7 @@ def preview(manager, document):
                          or (origin == current['portable_origin'] and x['id'] == ident)), None)
             expected = copy.deepcopy(row)
             if collection == 'servers':
+                expected['color'] = session_color(row)
                 expected['jump_id'] = mappings.get(row.get('jump_id'))
             else:
                 expected['server_id'] = mappings[row['server_id']]

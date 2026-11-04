@@ -6,10 +6,10 @@
   #error Supply /DOutputDir=the-private-output-directory
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.4.0"
+  #define AppVersion "1.4.1"
 #endif
 #ifndef AppBuild
-  #define AppBuild "13"
+  #define AppBuild "14"
 #endif
 #ifndef TargetArch
   #error Supply /DTargetArch=arm64 or x64
