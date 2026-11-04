@@ -1,6 +1,6 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-**پیش‌انتشار آزمایشی مک:** [سورس و نصب 1.4.0، بیلد 13](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.0-preview.1/docs/macos-preview-1.4.0.md) · [صفحهٔ پیش‌انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.0-preview.1). stable همچنان **1.3.2، بیلد 12** است؛ به‌روزرسانی اوبونتو و ویندوز جداگانه دنبال می‌شود.
+**پیش‌انتشار آزمایشی مک:** [سورس و نصب 1.4.1، بیلد 14](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.1-preview.1/docs/macos-preview-1.4.1.md) · [صفحهٔ پیش‌انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.1-preview.1). Tools، جزئیات Firewall و رنگ پایدار Session در این دورهٔ تست مک قرار دارند؛ stable همچنان **1.3.2، بیلد 12** است و به‌روزرسانی اوبونتو و ویندوز به بعد موکول شده است.
 
 مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
 
@@ -162,3 +162,11 @@ Keepalive / NO-OP به‌صورت پیش‌فرض روی ۳۰ ثانیه و ۳ �
 عکس‌های محیط در راهنمای انگلیسی فقط داده‌های نمایشی ساختگی دارند.
 
 ساخته‌شده توسط **Behzad Kiyani** با **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
+
+## رابط دورهٔ تست مک
+
+نمونه‌های رابط آزمایشی مک 1.4.1 با نام‌ها، کاربر demo و آدرس‌های مخصوص مستندسازی ساخته شده‌اند و اتصال شخصی را نشان نمی‌دهند.
+
+![Synthetic Session cards](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-sessions.png)
+
+![Tools with synthetic data](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-tools.png)

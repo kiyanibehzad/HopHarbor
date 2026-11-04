@@ -1,6 +1,6 @@
 # HopHarbor
 
-**macOS testing prerelease:** [1.4.0 · build 13 source and installation](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.0-preview.1/docs/macos-preview-1.4.0.md) · [prerelease](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.0-preview.1). Stable remains **1.3.2 · build 12**; Ubuntu and Windows updates will follow separately.
+**macOS testing prerelease:** [1.4.1 · build 14 source and installation](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.1-preview.1/docs/macos-preview-1.4.1.md) · [prerelease](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.1-preview.1). Tools, Firewall details and persistent Session colors are available in this Mac test cycle. Stable remains **1.3.2 · build 12**; Ubuntu and Windows updates are deferred.
 
 A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
@@ -308,3 +308,11 @@ HopHarbor's original code is MIT-licensed; see [LICENSE](LICENSE). GOST's MIT no
 The user service requests a soft open-file limit of up to 8,192, bounded by macOS and the inherited hard limit. This prevents the small default launchd limit from rejecting new proxy connections under concurrent traffic. Existing higher limits are preserved; hard limits are not lowered. Service status exposes the effective limits for diagnostics.
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
+
+## macOS test-cycle interface
+
+Synthetic examples of the 1.4.1 Mac testing interface; names, demo usernames and documentation-only addresses are illustrative.
+
+![Synthetic Session cards](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-sessions.png)
+
+![Tools with synthetic data](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-tools.png)
