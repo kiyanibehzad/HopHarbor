@@ -119,8 +119,8 @@ Each Session may select another Session as its Firewall. Create the intermediary
 - Start, stop, restart, edit, and test individual port forwards.
 - Optional automatic startup and delayed recovery after an SSH process fails.
 - One to four SSH sessions per port forward, distributing new connections across ready sessions.
-- Passwords and private-key passphrases stored through macOS Keychain or Ubuntu Secret Service.
-- A local English panel with macOS Dock/menu bar access or an Ubuntu desktop window and indicator.
+- Passwords and private-key passphrases stored through macOS Keychain, Ubuntu Secret Service or Windows Credential Manager.
+- A local English panel with macOS Dock/menu bar access, an Ubuntu GTK window/indicator or a Windows WebView2 window/tray.
 
 **A pool is not connection bonding.** One client connection uses one SSH session. A pool can distribute concurrent connections; it does not combine SSH sessions to accelerate one download. Start with one session and increase the count only when your workload benefits. Resource use depends on traffic, encryption, and pool size.
 
@@ -227,7 +227,7 @@ If you use a system-wide proxy router, review its rules for SSH processes and th
 
 ## Session controls and keepalive
 
-The **Sessions** view shows forwarding status, the count of ready SSH transports, and a separate **Firewall in use** indicator. **Connect**, **Disconnect**, and **Reconnect** apply to the forwarding entries saved under that Session. They do not stop entries belonging to other Sessions, including entries that use this Session as a Firewall. Add a forwarding entry before connecting an otherwise empty Session.
+The **Sessions** view shows forwarding status, the count of ready SSH transports, and a separate **Firewall in use** indicator. **Connect**, **Disconnect**, and **Reconnect** control the forwarding entries saved under that Session when forwards are configured. With no forwards, they control a standalone SSH transport without opening a proxy listener or remote shell. They do not stop entries belonging to other Sessions, including entries that use this Session as a Firewall. The Sessions **Disconnect All** action also stops owned standalone transports, including one connected before forwarding was added.
 
 The **Port Forwarding** view groups entries by Session and shows its Firewall route. Search and status filters apply inside those groups.
 
@@ -267,7 +267,7 @@ Do not commit personal configuration, keys, Keychain exports, tokens, runtime fi
 
 ## Development and local tests
 
-The controller uses Python's standard library; the native panel shell uses Swift/AppKit/WebKit; its interface uses local HTML, CSS and JavaScript. OpenSSH remains the SSH implementation. GOST handles HTTP proxying and connection selection.
+The controller uses Python's standard library and the shared interface uses local HTML, CSS and JavaScript. Native panels use Swift/AppKit/WebKit on macOS, GTK/WebKitGTK on Ubuntu and WinForms/WebView2 on Windows. OpenSSH handles SSH. GOST provides the macOS/Ubuntu frontend; Windows uses the project's Python frontend.
 
 Run boundary tests from the repository root:
 
