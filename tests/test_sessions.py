@@ -108,19 +108,20 @@ class SessionTests(unittest.TestCase):
         self.assertIs(manager.runtime['iran_http'], working)
         stop.assert_not_called()
 
-    def test_no_forward_and_invalid_session_actions_never_touch_processes(self):
+    def test_no_forward_actions_use_owned_session_transport(self):
         manager = self.manager
-        manager.config = base_config()  # Iran has no own forwards, but UK depends on it.
-        with mock.patch.object(manager, 'start') as start, mock.patch.object(manager, 'stop') as stop:
+        manager.config = base_config()
+        with mock.patch.object(manager, 'start_session_transport') as start, \
+                mock.patch.object(manager, 'stop_session_transport') as stop:
             for action in ['connect', 'disconnect', 'reconnect']:
-                with self.subTest(action=action), self.assertRaisesRegex(ValueError, 'no port forwarding entries'):
-                    manager.session_action('iran', action)
+                result = manager.session_action('iran', action)
+                self.assertTrue(result['ok'])
+            self.assertEqual(start.call_count, 2)
+            self.assertEqual(stop.call_count, 2)
             with self.assertRaises(KeyError):
                 manager.session_action('missing', 'connect')
             with self.assertRaises(KeyError):
                 manager.session_action('uk', 'start')
-        start.assert_not_called()
-        stop.assert_not_called()
 
     def test_status_counts_own_processes_and_transitive_firewall_use(self):
         manager = self.manager

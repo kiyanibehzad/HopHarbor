@@ -139,7 +139,7 @@ class WindowsPackageBoundaries(unittest.TestCase):
             for name in builder.APP_FILES + builder.WEB_FILES + builder.VENDOR_FILES:
                 path = source / name; path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('# synthetic public fixture\n')
-            (source / 'manager.py').write_text("VERSION='1.3.2'\nBUILD=12\n")
+            (source / 'manager.py').write_text("VERSION=" + repr(builder.VERSION) + "\nBUILD=" + str(builder.BUILD) + "\n")
             for name in ('LICENSE', 'THIRD-PARTY-NOTICES.md', 'packaging/windows/assets/HopHarbor.ico'):
                 path = source / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text('synthetic notice/icon')
             python = base / 'embedded-python.zip'

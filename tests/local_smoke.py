@@ -27,7 +27,8 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-RESULT_PATH = ROOT / 'tests' / 'local-smoke-results.json'
+RESULT_PATH = Path(os.environ.get('HOPHARBOR_SMOKE_REPORT', ROOT / 'tests' / 'local-smoke-results.json'))
+APP_ROOT = Path(os.environ.get('HOPHARBOR_SMOKE_APP', ROOT))
 SPEC = importlib.util.spec_from_file_location('hopharbor_local_smoke', ROOT / 'manager.py')
 pm = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pm)
@@ -92,6 +93,7 @@ class Origin(http.server.BaseHTTPRequestHandler):
 
 
 class LocalManager(pm.Manager):
+    allow_release_network = False
     def keychain(self, action, payload):
         # This test exercises unencrypted synthetic keys, not OS secret storage.
         if action == 'has':
@@ -99,11 +101,11 @@ class LocalManager(pm.Manager):
         raise AssertionError('The local smoke test must not access Keychain secrets')
 
 
-def make_ssh_server(folder, prefix, port, username, cleanup):
+def make_ssh_server(folder, prefix, port, username, cleanup, host_type='ed25519'):
     host = folder / (prefix + '-host')
     client = folder / (prefix + '-client')
     for path, role in [(host, 'host'), (client, 'client')]:
-        command(['/usr/bin/ssh-keygen', '-q', '-t', 'ed25519', '-N', '',
+        command(['/usr/bin/ssh-keygen', '-q', '-t', host_type if role == 'host' else 'ed25519', '-N', '',
                  '-C', 'hopharbor-local-smoke-' + role, '-f', str(path)])
     authorized = folder / (prefix + '-authorized_keys')
     authorized.write_text(client.with_suffix('.pub').read_text())
@@ -213,7 +215,7 @@ def main():
     started = time.monotonic()
     results = {'test': 'local-native-ssh-gost-smoke', 'external_connections': False,
                'production_settings_changed': False, 'checks': []}
-    scratch = ROOT / 'tests' / 'tmp'
+    scratch = Path(os.environ.get('HOPHARBOR_SMOKE_SCRATCH', ROOT / 'tests' / 'tmp'))
     scratch.mkdir(parents=True, exist_ok=True)
     cleanup = []
     manager = None
@@ -221,7 +223,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='local smoke ', dir=scratch) as temp:
         temporary = Path(temp).resolve()
         try:
-            if not (ROOT / 'bin/gost').is_file():
+            if not (APP_ROOT / 'bin/gost').is_file():
                 raise RuntimeError('Build or install the verified GOST binary first')
             excluded = set()
             jump_port, edge_port = free_port(excluded), free_port(excluded)
@@ -266,7 +268,7 @@ def main():
                 lines.append('[127.0.0.1]:%s %s %s' % (port, key_type, blob))
             (data / 'known_hosts').write_text('\n'.join(lines) + '\n')
             (data / 'known_hosts').chmod(0o600)
-            manager = LocalManager(data, ROOT, panel_port)
+            manager = LocalManager(data, APP_ROOT, panel_port)
             # Keep the test independent of the user's existing agent and avoid
             # adding synthetic keys to it through AddKeysToAgent.
             manager.child_env.pop('SSH_AUTH_SOCK', None)

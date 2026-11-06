@@ -98,6 +98,8 @@ remain opaque streams. UDP, TLS interception and bonding several SSH sessions
 into one faster TCP stream are not provided. macOS and Ubuntu retain their
 existing frontend implementation.
 
+To reproduce the published Windows 1.3.2 packages, use the `v1.3.2` source tag. Newer Mac source releases have not been validated as Windows updates.
+
 Build each architecture using `python3 packaging/build_windows.py --arch arm64`
 (or `x64`) with explicit `--output-dir`, `--cache-dir` and `--dotnet` paths. Run
 `--help` for arguments. A Windows build host can also supply `--iscc ISCC.exe` to

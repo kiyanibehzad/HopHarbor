@@ -30,12 +30,12 @@ Do not mix a source/per-user installation with a `.deb` installation. A unit in 
 
 ## Install from reviewed source instead
 
-Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
+These commands use the published Ubuntu 1.3.2 source; newer Mac releases do not imply a validated Ubuntu update. Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
 
 ```sh
 sudo apt update
 sudo apt install python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-ayatanaappindicator3-0.1 gir1.2-secret-1 gnome-keyring openssh-client curl dbus-user-session
-git clone https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.3.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install_linux.py
 ```

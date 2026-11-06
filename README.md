@@ -1,6 +1,7 @@
 # HopHarbor
 
-**macOS testing prerelease:** [1.4.1 · build 14 source and installation](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.1-preview.1/docs/macos-preview-1.4.1.md) · [prerelease](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.1-preview.1). Tools, Firewall details and persistent Session colors are available in this Mac test cycle. Stable remains **1.3.2 · build 12**; Ubuntu and Windows updates are deferred.
+**macOS — 1.4.2 · build 15:** [source download and installation](docs/macos-1.4.2.md) · [release notes](docs/release-1.4.2.md). Adds Session search, filters, Disconnect All and clearer Session cards. Ubuntu and Windows Preview downloads remain **1.3.2 · build 12**.
+
 
 A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
 
@@ -8,11 +9,11 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Win
 
 ## Supported systems
 
-**HopHarbor 1.3.2 · build 12** uses one shared source and release tag across macOS, Ubuntu and the Windows preview. [Release notes and validation](docs/release-1.3.2.md).
+The latest Mac release is **1.4.2 · build 15**. Ubuntu and Windows Preview packages remain **1.3.2 · build 12**, with their existing validation and support scope. Shared source version metadata does not mean a new package has been released for every platform. [Mac changes](docs/release-1.4.2.md) · [Ubuntu and Windows release](docs/release-1.3.2.md).
 
 | Operating system | Supported hardware | Latest published app | Installation |
 | --- | --- | --- | --- |
-| **macOS 13 or later** | **Apple Silicon / arm64** | 1.3.2 · build 12 (source) | [Build from source](#macos) |
+| **macOS 13 or later** | **Apple Silicon / arm64** | 1.4.2 · build 15 (source) | [Build from source](#macos) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.3.2 · build 12 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
 | **Windows Preview** | **ARM64:** Windows 11 24H2 native VM tested; **x64:** Windows 10 22H2 compatibility tested, native Windows 11 x64 unverified | 1.3.2 · build 12 | [Setup and ZIP guide](packaging/windows/README.md) |
 
@@ -73,7 +74,7 @@ For **macOS 13+ on Apple Silicon**. The current installation method builds the a
 Review the source, then run:
 
 ```sh
-git clone --branch v1.3.2 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.2 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -309,10 +310,10 @@ The user service requests a soft open-file limit of up to 8,192, bounded by macO
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
-## macOS test-cycle interface
+## macOS interface
 
-Synthetic examples of the 1.4.1 Mac testing interface; names, demo usernames and documentation-only addresses are illustrative.
+Synthetic examples of Session colors, live status icons, Firewall details and Tools; names and documentation-only addresses are illustrative. [1.4.2 installation guide](docs/macos-1.4.2.md).
 
-![Synthetic Session cards](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-sessions.png)
+![Synthetic Session cards](docs/images/macos-1.4.2-sessions.png)
 
-![Tools with synthetic data](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-tools.png)
+![Tools menu with synthetic data](docs/images/macos-1.4.2-tools.png)

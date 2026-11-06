@@ -21,8 +21,8 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '1.3.2'
-BUILD = 12
+VERSION = '1.4.2'
+BUILD = 15
 SDK_VERSION = '10.0.403'
 PYTHON_VERSION = '3.14.9'
 WEBVIEW_VERSION = '1.0.4314.35'
@@ -36,7 +36,7 @@ PYTHON_SHA256 = {
     'x64': '3c01d7cfc666f746a6f064f60fb2156ab0ec464d3d738ab796371a46a9bb24a2',
     'arm64': 'a8212664f7622ebc0cb0f9a42d7beee36cebedab97ff47c6bba668cfd85b676d',
 }
-APP_FILES = ('manager.py', 'log_policy.py', 'wake_monitor.py', 'ssh_hop.py',
+APP_FILES = ('manager.py', 'log_policy.py', 'wake_monitor.py', 'session_tools.py', 'configuration_portability.py', 'release_check.py', 'ssh_hop.py',
              'askpass.py', 'windows_platform.py', 'windows_proxy.py', 'install_windows.py')
 WEB_FILES = ('web/index.html', 'web/app.js')
 VENDOR_FILES = tuple('vendor/windows/' + name for name in (

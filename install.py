@@ -146,7 +146,7 @@ def main():
         data.chmod(0o700)
         app = data / 'app'
         app.mkdir(mode=0o700, exist_ok=True)
-        for name in ('manager.py', 'ssh_hop.py', 'askpass.py', 'log_policy.py', 'wake_monitor.py'):
+        for name in ('manager.py', 'ssh_hop.py', 'askpass.py', 'log_policy.py', 'wake_monitor.py', 'session_tools.py', 'configuration_portability.py', 'release_check.py'):
             shutil.copyfile(ROOT / name, app / name)
             (app / name).chmod(0o700)
         (app / 'web').mkdir(mode=0o700, exist_ok=True)

@@ -31,9 +31,12 @@ else:
 
 from log_policy import EventLog, LogMaintenance, install_service_streams
 from wake_monitor import WakeMonitor
+from session_tools import SessionTools
+from configuration_portability import ConfigurationTools, normalize_color
+from release_check import ReleaseChecker
 
-VERSION = '1.3.2'
-BUILD = 12
+VERSION = '1.4.2'
+BUILD = 15
 MAC_VERSION = VERSION
 MAC_BUILD = BUILD
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
@@ -416,7 +419,7 @@ class Child:
         return errors
 
 
-class Manager:
+class Manager(SessionTools, ConfigurationTools):
     def __init__(self, data_dir, app_dir, port, service_streams=()):
         # Do this before spawning managed children or reader/monitor threads.
         self.fd_limits = raise_file_limit(kernel_ceiling=kernel_file_limit())
@@ -454,6 +457,7 @@ class Manager:
         if self.fd_limits['warning']:
             self.log('error', 'Could not raise the open-file limit: ' + self.fd_limits['warning'])
         self.runtime = {}
+        self.session_runtime = {}
         self.front_probe_lock = threading.Lock()
         self.front_probes = {}
         self.halt = threading.Event()
@@ -473,14 +477,20 @@ class Manager:
         self.secret_status = {}
         for server in self.config.get('servers', []):
             self.refresh_secret_status(server['id'])
+        if 'portable_origin' not in self.config:
+            self.config['portable_origin'] = uuid.uuid4().hex
+            self.save()
         self.validate_all(self.config)
         self.write_ssh_config()
-        for tunnel in self.config['tunnels']:
+        for tunnel in self.ordered_tunnels():
             if tunnel.get('autostart'):
                 try:
                     self.start(tunnel['id'])
                 except Exception as e:
                     self.log('error', str(e), tunnel['id'])
+        self.release_checker = ReleaseChecker(self.data / 'release-cache.json', VERSION, atomic_json)
+        if getattr(self, 'allow_release_network', True):
+            self.release_checker.check()
         threading.Thread(target=self.watch, daemon=True).start()
 
     def reap_owned_children(self):
@@ -571,6 +581,31 @@ class Manager:
             timestamp = self.front_probes.pop((local, remote), None)
         return timestamp is not None and 0 <= time.monotonic() - timestamp <= 5
 
+    @staticmethod
+    def port_is_open(port):
+        return port_open(port)
+
+    @staticmethod
+    def ssh_executable():
+        return system_executable('ssh')
+
+    @staticmethod
+    def ssh_config_path(path):
+        return ssh_path(path)
+
+    @staticmethod
+    def write_private(path, text):
+        write_private_text(path, text)
+
+    def make_child(self, args, label, ident, server):
+        return Child(args, label, self, ident, server)
+
+    def stop_owned_batch(self, children):
+        return Child.stop_many(children)
+
+    def write_config_backup(self, config):
+        atomic_json(self.data / 'config-before-import.json', config)
+
     def save(self):
         atomic_json(self.config_path, self.config)
 
@@ -626,6 +661,8 @@ class Manager:
             if not ID_RE.fullmatch(s.get('id', '')) or s['id'] in ids:
                 raise ValueError('Invalid session ID.')
             ids.add(s['id'])
+            if 'color' in s:
+                s['color'] = normalize_color(s['color'])
             if not host_ok(s.get('host')) or not USER_RE.fullmatch(s.get('username', '')):
                 raise ValueError('Invalid session hostname or username.')
             s['port'] = integer(s.get('port', 22), 1, 65535, 'Invalid SSH port.')
@@ -752,6 +789,7 @@ class Manager:
             t = self.tunnel(tunnel_id)
             if tunnel_id in self.runtime:
                 return
+            self.check_identity_setup(self.server(t['server_id']))
             if port_open(t['local_port']):
                 raise ValueError('Another application is using this port. Choose a different local port.')
             used = {x['local_port'] for x in self.config['tunnels']} | {self.port}
@@ -782,6 +820,7 @@ class Manager:
                 atomic_json(cfgpath, self.gost_config(t, ports))
                 frontend_argv = [str(gost_executable(self.app)), '-C', str(cfgpath)]
             gost = Child(frontend_argv, t['name'] + ' / Proxy', self, tunnel_id)
+            self.stop_session_transport(t['server_id'])
             self.runtime[tunnel_id] = {'ports': ports, 'ssh': children, 'gost': gost,
                                        'status': 'starting', 'healthy': 0, 'last_test': None}
             for c in children:
@@ -791,6 +830,7 @@ class Manager:
 
     def stop(self, tunnel_id):
         with self.lock:
+            self.action_generation('tunnel', tunnel_id, advance=True)
             r = self.runtime.get(tunnel_id)
             if r:
                 r['stopping'] = True
@@ -815,7 +855,14 @@ class Manager:
                 raise KeyError('Action not found.')
             own = [t for t in self.config['tunnels'] if t['server_id'] == server_id]
             if not own:
-                raise ValueError('This session has no port forwarding entries. Add a port forwarding entry first.')
+                if action in ('disconnect', 'reconnect'):
+                    self.stop_session_transport(server_id)
+                if action in ('connect', 'reconnect'):
+                    self.start_session_transport(server_id)
+                return {'ok': True, 'server_id': server_id, 'action': action,
+                        'results': [{'server_id': server_id, 'ok': True}],
+                        'summary': {'requested': 1, 'succeeded': 1, 'failed': 0}}
+            self.stop_session_transport(server_id)
             results = []
             for tunnel in own:
                 result = {'tunnel_id': tunnel['id'], 'name': tunnel['name'], 'ok': True}
@@ -834,22 +881,14 @@ class Manager:
                     'results': results, 'summary': {'requested': len(results), 'succeeded': succeeded,
                                                   'failed': len(results) - succeeded}}
 
-    def _session_runtime_state(self, server_id, tunnels):
+    def _session_runtime_state(self, server_id, tunnels, paths=None):
         """Summarize existing forwarding runtimes; a Session has no separate transport."""
         own = [t for t in tunnels if t['server_id'] == server_id]
         active = [t for t in own if t['desired_running']]
-        by_id = {s['id']: s for s in self.config['servers']}
-        dependents = set()
-        for session in self.config['servers']:
-            seen = {session['id']}
-            jump = session.get('jump_id')
-            while jump and jump not in seen and jump in by_id:
-                if jump == server_id:
-                    dependents.add(session['id'])
-                    break
-                seen.add(jump)
-                jump = by_id[jump].get('jump_id')
+        paths = paths if paths is not None else self.firewall_paths()
+        dependents = {ident for ident, path in paths.items() if server_id in path}
         dependent_count = sum(t['server_id'] in dependents and t['desired_running'] for t in tunnels)
+        dependent_sessions = sum(ident in dependents for ident in getattr(self, 'session_runtime', {}))
         statuses = set()
         healthy_forward_count = 0
         for tunnel in active:
@@ -863,8 +902,9 @@ class Manager:
                     if healthy_ssh < tunnel['pool_size']:
                         status = 'degraded'
             statuses.add(status)
+        transport = getattr(self, 'session_runtime', {}).get(server_id)
         if not active:
-            status = 'in_use_as_firewall' if dependent_count else 'disconnected'
+            status = transport['status'] if transport else 'in_use_as_firewall' if dependent_count or dependent_sessions else 'disconnected'
         elif statuses == {'connected'}:
             status = 'connected'
         elif statuses == {'starting'}:
@@ -876,20 +916,29 @@ class Manager:
         return {'connection_status': status, 'own_forward_count': len(own),
                 'active_forward_count': len(active),
                 'healthy_forward_count': healthy_forward_count,
-                'active_ssh_count': sum(t['active_sessions'] for t in active),
-                'healthy_ssh_count': sum(min(t['healthy_sessions'], t['active_sessions']) for t in active),
-                'firewall_in_use': bool(dependent_count), 'dependent_forward_count': dependent_count}
+                'desired_running': bool(active or transport),
+                'last_error': transport['child'].error if transport else '',
+                'active_ssh_count': sum(t['active_sessions'] for t in active) + int(bool(transport and transport['child'].proc and transport['child'].proc.poll() is None)),
+                'healthy_ssh_count': sum(min(t['healthy_sessions'], t['active_sessions']) for t in active) + int(bool(transport and transport['child'].ready)),
+                'firewall_in_use': bool(dependent_count or dependent_sessions), 'dependent_forward_count': dependent_count,
+                'dependent_session_transport_count': dependent_sessions}
 
     def recover_after_wake(self):
         """Rebuild stale transports once per confirmed kernel wake, on the same ports."""
         with self.lock:
             active = [r for r in self.runtime.values() if not r.get('stopping')]
-            if not active:
+            sessions = [r for r in getattr(self, 'session_runtime', {}).values() if not r.get('stopping')]
+            proofs = list(getattr(self, 'proof_runtime', {}).values())
+            if not active and not sessions and not proofs:
                 return
             self.log('info', ('Mac woke from sleep' if sys.platform == 'darwin' else 'Computer resumed from sleep')
                      + '; refreshing active SSH connections.')
             started = time.monotonic()
             children = [c for r in active for c in r['ssh'] if not c.blocked]
+            children += [r['child'] for r in sessions if not r['child'].blocked]
+            for record in proofs:
+                record['cancelled'] = True
+                children.append(record['child'])
             self.wake_recovery = {'started': started, 'until': started + 90,
                                   'pending': set(), 'restored': set()}
             for tid, r in self.runtime.items():
@@ -897,6 +946,10 @@ class Manager:
                     r.update(status='starting', healthy=0, last_test=None)
                     if any(not c.blocked for c in r['ssh']):
                         self.wake_recovery['pending'].add(tid)
+            for sid, record in getattr(self, 'session_runtime', {}).items():
+                if not record.get('stopping') and not record['child'].blocked:
+                    record['status'] = 'connecting'
+                    self.wake_recovery['pending'].add('session-' + sid)
             errors = Child.stop_many(children)
             failed = {id(c) for c, _error in errors}
             for c in children:
@@ -925,7 +978,10 @@ class Manager:
 
     def watch(self):
         while not self.halt.wait(self.watch_interval()):
+            if hasattr(self, 'release_checker') and getattr(self, 'allow_release_network', True):
+                self.release_checker.check()
             with self.lock:
+                self.stop_endpoint_proofs(only_closing=True)
                 if self.wake_monitor.resumed():
                     self.recover_after_wake()
                 if time.monotonic() >= self.next_maintenance:
@@ -934,7 +990,17 @@ class Manager:
                         self.maintain_local_files()
                     except Exception:
                         self.log('warning', 'Local diagnostic cleanup could not finish; it will retry.')
-                for tid, r in list(self.runtime.items()):
+                rank = {s['id']: i for i, s in enumerate(self.ordered_servers())}
+                owners = {t['id']: t['server_id'] for t in self.config['tunnels']}
+                tasks = [(False, tid, r) for tid, r in list(self.runtime.items())]
+                tasks += [(True, sid, r) for sid, r in list(getattr(self, 'session_runtime', {}).items())]
+                for standalone, tid, r in sorted(tasks, key=lambda task: rank.get(task[1] if task[0] else owners.get(task[1]), 0)):
+                    if standalone:
+                        self.tick_session_transports(tid)
+                        self.record_wake_progress('session-' + tid, r)
+                        continue
+                    if r.get('bulk_pending'):
+                        continue
                     if r.get('stopping'):
                         try:
                             self.stop(tid)
@@ -974,7 +1040,7 @@ class Manager:
                     self.record_wake_progress(tid, r)
                 recovery = getattr(self, 'wake_recovery', None)
                 if recovery:
-                    recovery['pending'].intersection_update(self.runtime)
+                    recovery['pending'].intersection_update(set(self.runtime) | {'session-' + sid for sid in getattr(self, 'session_runtime', {})})
                     if not recovery['pending'] or time.monotonic() >= recovery['until']:
                         remaining = len(recovery['pending'])
                         if remaining or recovery['restored']:
@@ -1026,12 +1092,19 @@ class Manager:
                 tunnels.append(row)
             known = read_private_text(self.data / 'known_hosts').splitlines()
             servers = []
+            paths = self.firewall_paths()
+            dependent_counts = {s['id']: 0 for s in self.config['servers']}
+            for path in paths.values():
+                for ident in path:
+                    dependent_counts[ident] += 1
             for server in self.config['servers']:
                 row = dict(server)
                 host = server['host'] if server['port'] == 22 else '[%s]:%s' % (server['host'], server['port'])
                 row['host_key_trusted'] = any(l.split() and host in l.split()[0].split(',') for l in known)
                 row.update({k: bool(self.secret_status.get(server['id'], {}).get(k)) for k in ('has_password', 'has_key_passphrase')})
-                row.update(self._session_runtime_state(server['id'], tunnels))
+                row.update(self._session_runtime_state(server['id'], tunnels, paths))
+                row['firewall_path'] = paths[server['id']]
+                row['dependent_session_count'] = dependent_counts[server['id']]
                 servers.append(row)
             return {'servers': servers, 'tunnels': tunnels, 'logs': self.logs.snapshot(),
                     'service': {'version': MAC_VERSION if sys.platform == 'darwin' else VERSION,
@@ -1046,6 +1119,8 @@ class Manager:
                                                'max_message_chars': 800, 'repeat_window_seconds': 30,
                                                'disk_file_bytes': 262144, 'disk_files': 2,
                                                'cleanup_interval_seconds': 60, 'archives': 0},
+                                'release': self.release_checker.snapshot() if hasattr(self, 'release_checker') else {'status': 'unchecked'},
+                                'import_undo_available': bool(getattr(self, 'import_undo', None)),
                                 'default_identity_file': self.config.get('default_identity_file', '')},
                     'migration': self.config.get('migration', {})}
 
@@ -1056,13 +1131,28 @@ class Manager:
             existing = next((x for x in items if x['id'] == ident), None) if ident else None
             if ident and not existing:
                 raise KeyError('Item not found.')
+            # Color-only metadata updates are safe while this Session is in use.
+            # Preserve order, SSH configuration, credentials and owned processes.
+            if collection == 'servers' and existing and not delete and set(data) == {'color'}:
+                color = normalize_color(data['color'])
+                if existing.get('color') == color:
+                    return {'ok': True, 'id': ident}
+                existing['color'] = color
+                previous = self.config
+                self.config = current
+                try:
+                    self.save()
+                except Exception:
+                    self.config = previous
+                    raise
+                return {'ok': True, 'id': ident}
             if collection == 'tunnels' and ident in self.runtime:
                 raise ValueError('Stop this port forwarding entry before editing or deleting it.')
             if collection == 'servers' and ident:
                 affected = {ident}
                 for _ in self.config['servers']:
                     affected.update(s['id'] for s in self.config['servers'] if s.get('jump_id') in affected)
-                if any(t['server_id'] in affected and t['id'] in self.runtime for t in self.config['tunnels']):
+                if affected.intersection(getattr(self, 'session_runtime', {})) or any(t['server_id'] in affected and t['id'] in self.runtime for t in self.config['tunnels']):
                     raise ValueError('Stop the port forwarding entries that depend on this session first.')
                 if delete and (any(t['server_id'] == ident for t in self.config['tunnels']) or
                                any(s.get('jump_id') == ident for s in self.config['servers'])):
@@ -1071,11 +1161,13 @@ class Manager:
                 items.remove(existing)
             if not delete:
                 allowed = {'id', 'name', 'host', 'port', 'username', 'identity_file', 'jump_id', 'auth_mode',
-                           'keepalive_interval', 'keepalive_count'} if collection == 'servers' else {
+                           'keepalive_interval', 'keepalive_count', 'color'} if collection == 'servers' else {
                     'id', 'name', 'server_id', 'kind', 'local_port', 'remote_host', 'remote_port', 'pool_size', 'autostart', 'probe_type'}
                 record = dict(existing or {})
                 record.update({k: v for k, v in data.items() if k in allowed})
                 record['id'] = ident or uuid.uuid4().hex[:12]
+                if collection == 'servers' and record.get('identity_required') and record.get('auth_mode') not in ('key', 'key_password'):
+                    record['identity_required'] = False
                 items.append(record)
             self.validate_all(current)
             credentials = {}
@@ -1107,6 +1199,14 @@ class Manager:
                     raise ValueError('Invalid host public key.')
                 host = record['host'] if record['port'] == 22 else '[%s]:%s' % (record['host'], record['port'])
                 pin = host + ' ' + key[0] + ' ' + key[1] + '\n'
+            if collection == 'servers' and not delete and data.get('trust_ticket'):
+                if pin:
+                    raise ValueError('Choose either a verified endpoint or a manually trusted key.')
+                pin = self.verified_pin(ident, record, data['trust_ticket'])
+            if (collection == 'servers' and not delete and existing
+                    and (record['host'], record['port']) != (existing['host'], existing['port'])
+                    and self.trusted_keys(existing) and not pin):
+                raise ValueError('Verify the new endpoint with the previously trusted key, or enter a manually trusted host key before saving. The original endpoint is unchanged.')
             if credentials:
                 self.keychain('put', dict(credentials, server_id=record['id']))
             if collection == 'servers' and delete:
@@ -1125,8 +1225,20 @@ class Manager:
 
     def shutdown(self):
         self.halt.set()
+        errors = []
+        for cleanup in (self.stop_endpoint_proofs,
+                        lambda: self.stop_session_transports(list(getattr(self, 'session_runtime', {})))):
+            try:
+                cleanup()
+            except Exception as error:
+                errors.append(str(error))
         for tid in list(self.runtime):
-            self.stop(tid)
+            try:
+                self.stop(tid)
+            except Exception as error:
+                errors.append(str(error))
+        if errors:
+            raise RuntimeError('Some owned components could not stop: ' + '; '.join(errors))
         if self.service_lock is not None:
             if sys.platform == 'win32':
                 self.service_lock.close()
@@ -1181,9 +1293,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             raise ValueError('The request content type must be JSON.')
         n = int(self.headers.get('Content-Length', 0))
-        if not 0 <= n <= 65536:
+        limit = 262144 if urllib.parse.urlsplit(self.path).path == '/api/config/preview' else 65536
+        if not 0 <= n <= limit:
             raise ValueError('The request is too large.')
-        data = json.loads(self.rfile.read(n) or b'{}')
+        def unique_fields(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError('Duplicate JSON fields are not allowed.')
+                result[key] = value
+            return result
+        try:
+            data = json.loads(self.rfile.read(n) or b'{}', object_pairs_hook=unique_fields)
+        except UnicodeError:
+            raise ValueError('The request must contain valid UTF-8 JSON.')
         if not isinstance(data, dict):
             raise ValueError('Invalid request.')
         return data
@@ -1197,6 +1320,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if self.auth() else self.reply(401, {'error': 'Panel authentication is required. Reopen the app.'})
         if path == '/api/state':
             return self.reply(200, self.manager.state()) if self.auth() else self.reply(401, {'error': 'Panel authentication is required. Reopen the app.'})
+        if path == '/api/config/export':
+            return self.reply(200, self.manager.export_configuration()) if self.auth() else self.reply(401, {'error': 'Panel authentication is required.'})
         if path.startswith('/api/'):
             return self.reply(404, {'error': 'Endpoint not found.'})
         if path not in ('/', '/index.html', '/app.js'):
@@ -1228,6 +1353,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.reply(200, {'ok': True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
+            if parts == ['api', 'release', 'check'] and self.command == 'POST':
+                self.manager.release_checker.check(manual=True)
+                return self.reply(200, self.manager.release_checker.snapshot())
+            if parts == ['api', 'config', 'preview'] and self.command == 'POST':
+                return self.reply(200, self.manager.preview_import(data))
+            if parts == ['api', 'config', 'apply'] and self.command == 'POST':
+                return self.reply(200, self.manager.apply_import(data.get('ticket')))
+            if parts == ['api', 'config', 'undo'] and self.command == 'POST':
+                return self.reply(200, self.manager.undo_import())
+            if len(parts) == 4 and parts[:2] == ['api', 'bulk'] and self.command == 'POST':
+                return self.reply(200, self.manager.bulk_action(parts[2], parts[3]))
+            if len(parts) == 4 and parts[:2] == ['api', 'servers'] and parts[3] == 'verify-endpoint' and self.command == 'POST':
+                return self.reply(200, self.manager.prove_endpoint(parts[2], data))
             if len(parts) >= 2 and parts[0] == 'api' and parts[1] in ('servers', 'tunnels'):
                 collection = parts[1]
                 if len(parts) == 2 and self.command == 'POST':

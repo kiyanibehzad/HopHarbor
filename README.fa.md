@@ -1,6 +1,7 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-**پیش‌انتشار آزمایشی مک:** [سورس و نصب 1.4.1، بیلد 14](https://github.com/kiyanibehzad/HopHarbor/blob/v1.4.1-preview.1/docs/macos-preview-1.4.1.md) · [صفحهٔ پیش‌انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.1-preview.1). Tools، جزئیات Firewall و رنگ پایدار Session در این دورهٔ تست مک قرار دارند؛ stable همچنان **1.3.2، بیلد 12** است و به‌روزرسانی اوبونتو و ویندوز به بعد موکول شده است.
+**مک — 1.4.2، بیلد 15:** [دانلود سورس و نصب](docs/macos-1.4.2.md) · [توضیحات انتشار](docs/release-1.4.2.md). جست‌وجوی Session، فیلترها، Disconnect All و کارت‌های روشن‌تر اضافه شده‌اند. دانلودهای اوبونتو و Windows Preview روی **1.3.2، بیلد 12** باقی می‌مانند.
+
 
 مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
 
@@ -8,11 +9,11 @@
 
 ## سیستم‌های پشتیبانی‌شده
 
-**HopHarbor 1.3.2 · بیلد 12** برای مک، اوبونتو و نسخهٔ آزمایشی ویندوز از یک سورس و تگ انتشار مشترک استفاده می‌کند. [توضیحات انتشار و اعتبارسنجی](docs/release-1.3.2.md).
+آخرین انتشار مک **1.4.2 · بیلد 15** است. بسته‌های اوبونتو و Windows Preview با همان محدودهٔ پشتیبانی و آزمون قبلی روی **1.3.2 · بیلد 12** باقی می‌مانند. نسخهٔ مشترک در متادیتای سورس به‌معنای انتشار بستهٔ جدید برای همهٔ پلتفرم‌ها نیست. [تغییرات مک](docs/release-1.4.2.md) · [انتشار اوبونتو و ویندوز](docs/release-1.3.2.md).
 
 | سیستم‌عامل | سخت‌افزار | آخرین نسخهٔ منتشرشده | روش نصب |
 | --- | --- | --- | --- |
-| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.3.2 · بیلد 12 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
+| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.4.2 · بیلد 15 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
 | **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.3.2 · بیلد 12 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
 | **Windows Preview — آزمایشی** | **ARM64:** آزمون بومی در VM ویندوز 11 نسخهٔ 24H2؛ **x64:** آزمون سازگاری ویندوز 10 نسخهٔ 22H2، بدون تأیید بومی ویندوز 11 x64 | 1.3.2 · بیلد 12 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
 
@@ -61,7 +62,7 @@ sudo apt install ./hopharbor_1.3.2_arm64.deb
 پس از بررسی سورس اجرا کنید:
 
 ```sh
-git clone --branch v1.3.2 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.2 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"
@@ -163,10 +164,10 @@ Keepalive / NO-OP به‌صورت پیش‌فرض روی ۳۰ ثانیه و ۳ �
 
 ساخته‌شده توسط **Behzad Kiyani** با **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
 
-## رابط دورهٔ تست مک
+## رابط مک
 
-نمونه‌های رابط آزمایشی مک 1.4.1 با نام‌ها، کاربر demo و آدرس‌های مخصوص مستندسازی ساخته شده‌اند و اتصال شخصی را نشان نمی‌دهند.
+نمونه‌های تصویری با نام‌ها، کاربر demo و آدرس‌های مخصوص مستندسازی ساخته شده‌اند و اتصال شخصی را نشان نمی‌دهند. [راهنمای نصب 1.4.2](docs/macos-1.4.2.md).
 
-![Synthetic Session cards](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-sessions.png)
+![کارت‌های Session با دادهٔ مصنوعی](docs/images/macos-1.4.2-sessions.png)
 
-![Tools with synthetic data](https://raw.githubusercontent.com/kiyanibehzad/HopHarbor/v1.4.1-preview.1/docs/images/macos-1.4.1-tools.png)
+![منوی Tools با دادهٔ مصنوعی](docs/images/macos-1.4.2-tools.png)
