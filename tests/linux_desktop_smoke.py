@@ -65,7 +65,7 @@ def main():
             return (app.browser is not None and not app.browser.is_loading()
                     and evaluate(app.browser,
                                  'document.getElementById("serviceLabel")?.textContent')
-                    == 'Local service online')
+                    == 'Online')
         except AssertionError:
             return False
 

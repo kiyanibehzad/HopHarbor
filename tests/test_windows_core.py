@@ -84,7 +84,13 @@ class WindowsCoreTests(unittest.TestCase):
 
     def test_startup_uses_exclusive_native_lock_and_private_unicode_files(self):
         data = self.root / 'new private data'
-        with mock.patch.object(pm.threading, 'Thread'):
+        # sys.platform is synthetic win32 here, but the host's SSL module is
+        # still POSIX. Keep the actual checker with an explicit no-network
+        # opener; never ask host TLS to load a nonexistent Windows cert store.
+        checker_type = pm.ReleaseChecker
+        opener = mock.Mock(side_effect=AssertionError('No network in startup fixture'))
+        with mock.patch.object(pm.threading, 'Thread'), \
+                mock.patch.object(pm, 'ReleaseChecker', side_effect=lambda *args: checker_type(*args, opener=opener)):
             manager = pm.Manager(data, self.manager.app, 23999)
         self.addCleanup(manager.shutdown)
         self.native.ServiceLock.assert_called_once_with(data.resolve() / '.service.lock')

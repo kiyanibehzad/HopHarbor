@@ -1,6 +1,6 @@
 # HopHarbor
 
-**macOS — 1.4.2 · build 15:** [source download and installation](docs/macos-1.4.2.md) · [release notes](docs/release-1.4.2.md). Adds Session search, filters, Disconnect All and clearer Session cards. Ubuntu and Windows Preview downloads remain **1.3.2 · build 12**.
+**HopHarbor 1.4.2 · build 15:** [macOS source installation](docs/macos-1.4.2.md) · [Ubuntu packages](#ubuntu-2604-lts) · [Windows Preview guide](packaging/windows/README.md) · [platform source and validation](docs/release-1.4.2-platforms.md).
 
 
 A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
@@ -9,41 +9,29 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Win
 
 ## Supported systems
 
-The latest Mac release is **1.4.2 · build 15**. Ubuntu and Windows Preview packages remain **1.3.2 · build 12**, with their existing validation and support scope. Shared source version metadata does not mean a new package has been released for every platform. [Mac changes](docs/release-1.4.2.md) · [Ubuntu and Windows release](docs/release-1.3.2.md).
+**HopHarbor 1.4.2 · build 15** is available for macOS, Ubuntu and Windows Preview. The original Mac source tag/archive is retained; Ubuntu and Windows native updates use the [reviewed supplementary platform source and validation record](docs/release-1.4.2-platforms.md). [Mac changes](docs/release-1.4.2.md).
 
 | Operating system | Supported hardware | Latest published app | Installation |
 | --- | --- | --- | --- |
 | **macOS 13 or later** | **Apple Silicon / arm64** | 1.4.2 · build 15 (source) | [Build from source](#macos) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.3.2 · build 12 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows Preview** | **ARM64:** Windows 11 24H2 native VM tested; **x64:** Windows 10 22H2 compatibility tested, native Windows 11 x64 unverified | 1.3.2 · build 12 | [Setup and ZIP guide](packaging/windows/README.md) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.4.2 · build 15 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview** | **ARM64:** Windows 11 25H2 native VM tested; **x64:** packages built/inspected, native Windows 11 x64 unverified | 1.4.2 · build 15 | [Setup and ZIP guide](packaging/windows/README.md) |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
 The native panels recover local sign-in after cookie expiry without restarting background connections. Native frame protections reject child-frame access to recovery. Existing releases remain available. [macOS](docs/macos-panel-recovery.md), [Ubuntu](docs/ubuntu-panel-recovery.md) and [Windows](docs/windows-panel-recovery.md) validation records describe the tested scope.
 
-## Windows preview — 1.3.2 · build 12
+## Windows preview — 1.4.2 · build 15
 
-- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [Download Setup — Windows 11 ARM64 tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
-- [Portable ZIPs and release notes](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [Installation and usage](packaging/windows/README.md).
+- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe).
+- [ARM64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-portable.zip) · [x64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-portable.zip) · [Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt) · [Installation and validation scope](packaging/windows/README.md).
 
-Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client
-and Microsoft Edge WebView2 Runtime must already be available. Settings and
-credentials start empty; enter your own Sessions in the panel. The preview is
-unsigned. The exact published ARM64 ZIP and Setup were tested on **Windows 11 Pro
-24H2 ARM64 (build 26100.7840)**, including recovery, credentials, forwarding and
-actual install/uninstall. The app, controller, Python, OpenSSH and WebView2 ran as
-ARM64; the Setup engine and separate synthetic test server ran as emulated x64.
-Windows 10 Pro 22H2 x64 compatibility evidence is also recorded. Windows remains
-**Preview**: native Windows 11 x64, physical sleep, real OS network/logon/RDP
-transitions, SSH-agent integration and signing/reputation remain unverified.
+Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client and Microsoft Edge WebView2 Runtime must already be available. Settings and credentials start empty; enter your own Sessions in the panel. The preview is unsigned.
 
-The earlier Windows 10 x64 grouped 2 MiB/four-second failure remains a failed
-historical result, reproduced on the previous preview. Windows 11 ARM64 passed all
-20 original protocol cases with unchanged deadlines. Its additional synthetic
-2 MiB transfer completed in about 0.47 seconds; this is not an Internet-speed
-benchmark. See [ARM64 validation](docs/windows-arm64-validation-1.3.2.md) and
-[recovery and historical limits](docs/windows-panel-recovery.md).
+The ARM64 payload was tested as an ordinary user on **Windows 11 Pro 25H2 ARM64 (build 26200.9711)**. Product Python, controller, helper and OpenSSH execution were checked using actual executable paths, hashes and PE architecture; the separate synthetic server Python and Inno Setup engine ran as emulated x64. Windows remains **Preview**: native Windows 11 x64, physical sleep, real OS network/logon/RDP transitions, SSH-agent integration, signing/reputation and a clean unprovisioned machine remain outside this validation.
+
+Earlier Windows 10 x64 compatibility evidence belongs to **1.3.2**, including the retained grouped 2 MiB/four-second failure. New ARM64 results do not rewrite that historical failure or establish current x64 native validation. See [historical ARM64 validation](docs/windows-arm64-validation-1.3.2.md) and the [current Windows guide](packaging/windows/README.md).
 
 ## Install
 
@@ -51,21 +39,21 @@ benchmark. See [ARM64 validation](docs/windows-arm64-validation-1.3.2.md) and
 
 Download the package for your Ubuntu computer, then run the matching command from its download folder:
 
-**Intel / AMD (amd64):** [Download hopharbor_1.3.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_amd64.deb)
+**Intel / AMD (amd64):** [Download hopharbor_1.4.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.3.2_amd64.deb
+sudo apt install ./hopharbor_1.4.2_amd64.deb
 ```
 
-**ARM64 (arm64):** [Download hopharbor_1.3.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_arm64.deb)
+**ARM64 (arm64):** [Download hopharbor_1.4.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.3.2_arm64.deb
+sudo apt install ./hopharbor_1.4.2_arm64.deb
 ```
 
 Open **HopHarbor** from Applications. Packages include the verified GOST dependency; APT installs the required desktop libraries. Add your own Sessions and port forwards in the panel.
 
-[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt)
+[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Ubuntu-1.4.2-SHA256SUMS.txt)
 
 ### macOS
 

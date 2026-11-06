@@ -10,8 +10,10 @@ from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import sys
+import tempfile
 import time
 from urllib.parse import quote, urlsplit
 
@@ -20,6 +22,66 @@ VERSION = '1.4.2'
 BUILD = '15'
 REPOSITORY_URL = 'https://github.com/kiyanibehzad/HopHarbor'
 PANEL_CONTENT_POLICY = "script-src 'none'; frame-src 'none'; child-src 'none'"
+FILE_LIMIT = 262144
+MESSAGE_LIMIT = FILE_LIMIT + 128
+
+
+def official_url_allowed(uri):
+    return (uri == REPOSITORY_URL or isinstance(uri, str) and re.fullmatch(
+        r'https://github\.com/kiyanibehzad/HopHarbor/releases(?:/tag/v?\d{1,6}\.\d{1,6}\.\d{1,6})?', uri) is not None)
+
+
+def portable_export_bytes(document):
+    from configuration_portability import FORMAT, SESSION, FORWARD, exact_fields
+    exact_fields(document, {'format', 'schema_version', 'origin', 'sessions', 'forwards', 'settings'},
+                 {'format', 'schema_version', 'origin', 'sessions', 'forwards', 'settings'})
+    if (document['format'] != FORMAT or type(document['schema_version']) is not int
+            or document['schema_version'] != 1 or document['settings'] != {}
+            or not isinstance(document['settings'], dict)
+            or not isinstance(document['origin'], str)
+            or re.fullmatch('[a-f0-9]{32}', document['origin']) is None):
+        raise ValueError('Invalid portable configuration.')
+    for key, fields in (('sessions', SESSION), ('forwards', FORWARD)):
+        rows = document[key]
+        if not isinstance(rows, list) or len(rows) > 100:
+            raise ValueError('Invalid portable collections.')
+        for row in rows:
+            exact_fields(row, fields, {'id'})
+            if any(type(value) not in (str, int, bool, type(None)) for value in row.values()):
+                raise ValueError('Invalid portable field.')
+    data = (json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8')
+    if len(data) > FILE_LIMIT:
+        raise ValueError('Configuration is too large.')
+    return data
+
+
+def import_file_allowed(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0))
+    try:
+        info = os.fstat(descriptor)
+        return stat.S_ISREG(info.st_mode) and 0 < info.st_size <= FILE_LIMIT
+    finally:
+        os.close(descriptor)
+
+
+def write_export_file(path, data):
+    path = Path(path)
+    if path.is_symlink() or len(data) > FILE_LIMIT:
+        raise ValueError('Invalid export destination or size.')
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix='.hopharbor-export-', dir=path.parent, delete=False) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if path.is_symlink():
+            raise ValueError('Invalid export destination.')
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def default_data_dir(environ=None, home=None):
@@ -139,7 +201,9 @@ def recovery_scripts(port):
     validate = """const valid=m=>m&&typeof m==='object'&&!Array.isArray(m)&&(
       (Object.keys(m).length===1&&m.action==='ready')||
       (Object.keys(m).length===2&&m.action==='reauthenticate'&&
-       ['authentication','retry'].includes(m.reason)));"""
+       ['authentication','retry'].includes(m.reason))||
+      (Object.keys(m).length===2&&m.action==='exportConfiguration'&&
+       m.document&&typeof m.document==='object'&&!Array.isArray(m.document)));"""
     facade = ('(()=>{' + guard + """
       // Keep the original WindowProxy as the method receiver. A wrapper OR a
       // bound function changes the incumbent realm for a child calling its
@@ -154,7 +218,7 @@ def recovery_scripts(port):
         if(!event.isTrusted||event.source!==window||event.origin!==""" + origin + """||
            location.origin!==""" + origin + """||!['/','/index.html'].includes(location.pathname))return;
         try{const m=event.data;if(valid(m)){
-          const text=JSON.stringify(m);if(text.length<=160)send(text);
+          const text=JSON.stringify(m);if(text.length<=262272)send(text);
         }}catch{}
       });
     })();""")
@@ -250,6 +314,8 @@ def desktop_application(data_dir, app_dir):
             self.recovery_source = None
             self.load_timeout_source = None
             self.panel_active = False
+            self.file_dialog = None
+            self.file_request = None
 
         def do_startup(self):
             Gtk.Application.do_startup(self)
@@ -361,6 +427,7 @@ def desktop_application(data_dir, app_dir):
 
         def discard_page(self):
             self.generation += 1
+            self.cancel_file_dialog()
             self.cancel_recovery()
             self.cancel_load_timeout()
             if self.browser is not None:
@@ -376,6 +443,7 @@ def desktop_application(data_dir, app_dir):
 
         def close_panel(self, *_args):
             self.panel_active = False
+            self.cancel_file_dialog()
             self.cancel_recovery()
             self.cancel_load_timeout()
             if self.indicator is not None:
@@ -478,7 +546,7 @@ def desktop_application(data_dir, app_dir):
             browser.connect('decide-policy', self.decide_policy)
             browser.connect('create', lambda *_: None)
             browser.connect('permission-request', self.deny_permission)
-            browser.connect('run-file-chooser', self.deny_file_chooser)
+            browser.connect('run-file-chooser', self.choose_configuration_file)
             browser.connect('load-failed', self.load_failed)
             browser.connect('load-changed', self.load_changed)
             browser.connect('web-process-terminated', self.renderer_terminated)
@@ -504,9 +572,15 @@ def desktop_application(data_dir, app_dir):
                 if not value.is_string():
                     return
                 text = value.to_string()
-                if len(text) > 160:
+                if len(text.encode('utf-8')) > MESSAGE_LIMIT:
                     return
-                action = recovery_message(json.loads(text))
+                payload = json.loads(text)
+                action = recovery_message(payload)
+                if (isinstance(payload, dict) and set(payload) == {'action', 'document'}
+                        and payload['action'] == 'exportConfiguration'):
+                    data = portable_export_bytes(payload['document'])
+                    self.export_configuration(data, browser, generation)
+                    return
             except (ValueError, TypeError, AttributeError):
                 return
             if action == 'ready':
@@ -565,9 +639,93 @@ def desktop_application(data_dir, app_dir):
             request.deny()
             return True
 
-        def deny_file_chooser(self, _browser, request):
-            request.cancel()
+        def cancel_file_dialog(self):
+            dialog, self.file_dialog = self.file_dialog, None
+            request, self.file_request = self.file_request, None
+            if request is not None:
+                request.cancel()
+            if dialog is not None:
+                dialog.destroy()
+
+        def configuration_dialog(self, save=False):
+            dialog = Gtk.FileChooserDialog(
+                title=('Export' if save else 'Import') + ' HopHarbor configuration',
+                transient_for=self.window, modal=True,
+                action=Gtk.FileChooserAction.SAVE if save else Gtk.FileChooserAction.OPEN)
+            dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL,
+                               'Save' if save else 'Open', Gtk.ResponseType.ACCEPT)
+            dialog.set_select_multiple(False)
+            only_json = Gtk.FileFilter()
+            only_json.set_name('JSON configuration')
+            only_json.add_pattern('*.json')
+            dialog.add_filter(only_json)
+            if save:
+                dialog.set_current_name('HopHarbor-configuration.json')
+                dialog.set_do_overwrite_confirmation(True)
+            self.file_dialog = dialog
+            return dialog
+
+        def choose_configuration_file(self, browser, request):
+            # The native CSP prevents child scripts and frame loads. File
+            # requests additionally require the current owned panel generation.
+            generation = self.generation
+            if (not self.current_page(browser, generation) or self.file_dialog is not None
+                    or request.get_select_multiple()):
+                request.cancel()
+                return True
+            self.file_request = request
+            dialog = self.configuration_dialog()
+
+            def chosen(chooser, response):
+                if chooser is not self.file_dialog:
+                    return
+                self.file_dialog = self.file_request = None
+                try:
+                    path = chooser.get_filename()
+                    if (response == Gtk.ResponseType.ACCEPT and self.current_page(browser, generation)
+                            and path and import_file_allowed(path)):
+                        request.select_files([path])
+                    else:
+                        request.cancel()
+                except (OSError, ValueError):
+                    request.cancel()
+                finally:
+                    chooser.destroy()
+
+            dialog.connect('response', chosen)
+            dialog.show_all()
             return True
+
+        def export_configuration(self, data, browser, generation):
+            if not self.current_page(browser, generation) or self.file_dialog is not None:
+                return
+            dialog = self.configuration_dialog(save=True)
+
+            def chosen(chooser, response):
+                if chooser is not self.file_dialog:
+                    return
+                self.file_dialog = None
+                status = 'cancelled'
+                try:
+                    if not self.current_page(browser, generation):
+                        return
+                    path = chooser.get_filename()
+                    if response == Gtk.ResponseType.ACCEPT and path:
+                        write_export_file(path, data)
+                        status = 'saved'
+                except (OSError, ValueError):
+                    status = 'error'
+                finally:
+                    chooser.destroy()
+                if self.current_page(browser, generation):
+                    # Fixed status only; neither native paths nor contents are
+                    # returned to page scripts by the export callback.
+                    browser.run_javascript(
+                        "window.dispatchEvent(new CustomEvent('hopharbor-file-result',"
+                        "{detail:{status:" + json.dumps(status) + "}}));", None, None, None)
+
+            dialog.connect('response', chosen)
+            dialog.show_all()
 
         def decide_policy(self, browser, decision, kind):
             if browser is not self.browser:
@@ -577,10 +735,10 @@ def desktop_application(data_dir, app_dir):
                         WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION):
                 action = decision.get_navigation_action()
                 uri = action.get_request().get_uri()
-                if (uri == REPOSITORY_URL and action.is_user_gesture()
+                if (official_url_allowed(uri) and action.is_user_gesture()
                         and kind == WebKit2.PolicyDecisionType.NAVIGATION_ACTION):
                     # The only supported external destination; never include a token.
-                    Gio.AppInfo.launch_default_for_uri(REPOSITORY_URL, None)
+                    Gio.AppInfo.launch_default_for_uri(uri, None)
                     decision.ignore()
                     return True
                 allowed = (kind == WebKit2.PolicyDecisionType.NAVIGATION_ACTION

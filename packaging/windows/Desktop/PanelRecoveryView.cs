@@ -21,6 +21,11 @@ internal sealed partial class PanelForm
     private void HandlePanelMessage(WebView2 view, long generation, string source, string json)
     {
         if (!CurrentDocument(view, generation, source)) return;
+        if (PanelFilePolicy.ExportDocument(json) is byte[] document)
+        {
+            ExportConfiguration(view, generation, source, document);
+            return;
+        }
         switch (PanelRecoveryPolicy.Command(json))
         {
             case "ready":

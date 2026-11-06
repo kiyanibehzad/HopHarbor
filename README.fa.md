@@ -1,6 +1,6 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-**مک — 1.4.2، بیلد 15:** [دانلود سورس و نصب](docs/macos-1.4.2.md) · [توضیحات انتشار](docs/release-1.4.2.md). جست‌وجوی Session، فیلترها، Disconnect All و کارت‌های روشن‌تر اضافه شده‌اند. دانلودهای اوبونتو و Windows Preview روی **1.3.2، بیلد 12** باقی می‌مانند.
+**HopHarbor 1.4.2، بیلد 15:** [نصب مک از سورس](docs/macos-1.4.2.md) · [بسته‌های اوبونتو](#نصب-روی-اوبونتو) · [Windows Preview](packaging/windows/README.md) · [سورس تکمیلی و اعتبارسنجی پلتفرم‌ها](docs/release-1.4.2-platforms.md).
 
 
 مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
@@ -9,29 +9,29 @@
 
 ## سیستم‌های پشتیبانی‌شده
 
-آخرین انتشار مک **1.4.2 · بیلد 15** است. بسته‌های اوبونتو و Windows Preview با همان محدودهٔ پشتیبانی و آزمون قبلی روی **1.3.2 · بیلد 12** باقی می‌مانند. نسخهٔ مشترک در متادیتای سورس به‌معنای انتشار بستهٔ جدید برای همهٔ پلتفرم‌ها نیست. [تغییرات مک](docs/release-1.4.2.md) · [انتشار اوبونتو و ویندوز](docs/release-1.3.2.md).
+**HopHarbor 1.4.2 · بیلد 15** برای مک، اوبونتو و Windows Preview عرضه شده است. تگ و آرشیو اصلی مک حفظ شده‌اند؛ اصلاحات بومی اوبونتو و ویندوز در [سورس تکمیلی و گزارش اعتبارسنجی پلتفرم‌ها](docs/release-1.4.2-platforms.md) مشخص‌اند. [تغییرات مک](docs/release-1.4.2.md).
 
 | سیستم‌عامل | سخت‌افزار | آخرین نسخهٔ منتشرشده | روش نصب |
 | --- | --- | --- | --- |
 | **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.4.2 · بیلد 15 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.3.2 · بیلد 12 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows Preview — آزمایشی** | **ARM64:** آزمون بومی در VM ویندوز 11 نسخهٔ 24H2؛ **x64:** آزمون سازگاری ویندوز 10 نسخهٔ 22H2، بدون تأیید بومی ویندوز 11 x64 | 1.3.2 · بیلد 12 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.4.2 · بیلد 15 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview — آزمایشی** | **ARM64:** آزمون بومی در VM ویندوز 11 نسخهٔ 25H2؛ **x64:** بستهٔ ساخته‌شده و بررسی‌شده، بدون تأیید بومی ویندوز 11 x64 | 1.4.2 · بیلد 15 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
 پنل‌های بومی پس از انقضای کوکی، ورود محلی را بدون راه‌اندازی دوبارهٔ اتصال‌های پس‌زمینه بازیابی می‌کنند. حفاظت بومی فریم، دسترسی فریم فرزند به بازیابی را محدود می‌کند. انتشارهای قبلی حفظ شده‌اند. وضعیت آزمون‌های [مک](docs/macos-panel-recovery.md)، [اوبونتو](docs/ubuntu-panel-recovery.md) و [ویندوز](docs/windows-panel-recovery.md) مشخص است.
 
-## نسخهٔ آزمایشی ویندوز — 1.3.2 · بیلد 12
+## نسخهٔ آزمایشی ویندوز — 1.4.2 · بیلد 15
 
-- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [دانلود نصب‌کننده — آزموده‌شده روی Windows 11 ARM64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe).
-- [فایل‌های ZIP و توضیحات انتشار](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) · [راهنمای نصب و استفاده](packaging/windows/README.md).
+- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe).
+- [ZIP قابل‌حمل ARM64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-portable.zip) · [ZIP قابل‌حمل x64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-portable.zip) · [فایل SHA-256 ویندوز](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt) · [راهنمای نصب و محدودهٔ آزمون](packaging/windows/README.md).
 
-نصب‌کننده را در حساب معمولی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را در پنل وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد.
+نصب‌کننده را با حساب عادی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد.
 
-همان فایل‌های ARM64 منتشرشده روی **Windows 11 Pro 24H2 ARM64، بیلد 26100.7840** در VM آزمایش شدند؛ بازیابی پنل، اعتبارنامه‌ها، اتصال و نصب/حذف واقعی موفق بودند. برنامه، کنترل‌گر، Python، OpenSSH و WebView2 بومی ARM64 بودند؛ موتور نصب و سرور مصنوعی جداگانهٔ آزمون با شبیه‌سازی x64 اجرا شدند. سابقهٔ سازگاری Windows 10 Pro 22H2 x64 نیز حفظ شده است. Windows همچنان **Preview — آزمایشی** است: اجرای بومی Windows 11 x64، خواب واقعی، تغییرات واقعی شبکه/ورود/RDP، یکپارچگی SSH-agent و امضا/اعتبار برنامه تأیید نشده‌اند.
+محمولهٔ ARM64 با کاربر عادی روی **Windows 11 Pro 25H2 ARM64، بیلد 26200.9711** آزموده شد. اجرای Python، کنترل‌گر، کمک‌ابزار و OpenSSH محصول با مسیر، هش و معماری PE واقعی بررسی شد؛ Python سرور مصنوعی جداگانه و موتور Inno Setup با شبیه‌سازی x64 اجرا شدند. Windows همچنان **Preview — آزمایشی** است: اجرای بومی Windows 11 x64، خواب واقعی، تغییرات واقعی شبکه/ورود/RDP، یکپارچگی SSH-agent، امضا/اعتبار برنامه و نصب روی سیستم آماده‌سازی‌نشده در محدودهٔ این تأیید نیستند.
 
-شکست قبلی آزمون گروهی انتقال ۲ MiB با مهلت چهار ثانیه در Windows 10 x64، که روی پیش‌نمایش قبلی هم تکرار شد، به‌عنوان نتیجهٔ ناموفق تاریخی حفظ می‌شود. در Windows 11 ARM64 هر ۲۰ آزمون اصلی پروتکل با همان مهلت‌ها پاس شدند؛ انتقال مصنوعی تکمیلی حدود ۰٫۴۷ ثانیه طول کشید و معیار سرعت اینترنت نیست. [اعتبارسنجی ARM64](docs/windows-arm64-validation-1.3.2.md) و [بازیابی و محدودیت‌های تاریخی](docs/windows-panel-recovery.md) جزئیات را دارند.
+سابقهٔ سازگاری Windows 10 x64 مربوط به **1.3.2** است؛ شکست قبلی آزمون گروهی انتقال ۲ MiB با مهلت چهار ثانیه حفظ شده است. موفقیت جدید ARM64 این شکست تاریخی را بازنویسی نمی‌کند و تأیید بومی x64 نسخهٔ فعلی نیست. [اعتبارسنجی تاریخی ARM64](docs/windows-arm64-validation-1.3.2.md) و [راهنمای فعلی ویندوز](packaging/windows/README.md) محدودهٔ شواهد را مشخص می‌کنند.
 
 ## نصب
 
@@ -39,21 +39,21 @@
 
 بستهٔ مناسب سخت‌افزار اوبونتو را دانلود و دستور همان معماری را در پوشهٔ دانلود اجرا کنید:
 
-**Intel / AMD — amd64:** [دانلود hopharbor_1.3.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_amd64.deb)
+**Intel / AMD — amd64:** [دانلود hopharbor_1.4.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.3.2_amd64.deb
+sudo apt install ./hopharbor_1.4.2_amd64.deb
 ```
 
-**ARM64 — arm64:** [دانلود hopharbor_1.3.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/hopharbor_1.3.2_arm64.deb)
+**ARM64 — arm64:** [دانلود hopharbor_1.4.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.3.2_arm64.deb
+sudo apt install ./hopharbor_1.4.2_arm64.deb
 ```
 
 سپس **HopHarbor** را از فهرست برنامه‌ها باز کنید و Sessionها و پورت‌فورواردهای خودتان را بسازید. بسته شامل GOST تأییدشده است و APT کتابخانه‌های موردنیاز دسکتاپ را نصب می‌کند.
 
-[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt)
+[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Ubuntu-1.4.2-SHA256SUMS.txt)
 
 ### نصب روی مک
 

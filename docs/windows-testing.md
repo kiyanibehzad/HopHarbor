@@ -1,6 +1,11 @@
 # Windows validation records
 
-Current 1.3.2/build 12 evidence includes [native Windows 11 ARM64 validation](windows-arm64-validation-1.3.2.md) of the exact published ZIP and Setup, alongside [Windows 10 x64 recovery validation and its historical protocol deadline failure](windows-panel-recovery.md). Windows remains Preview; the later ARM64 results do not replace the historical outcomes below.
+Current **1.4.2/build 15** evidence is recorded in
+[native Windows 11 ARM64 validation](windows-arm64-validation-1.4.2.md).
+The [1.3.2 ARM64 record](windows-arm64-validation-1.3.2.md) and
+[Windows 10 x64 recovery validation and historical protocol deadline failure](windows-panel-recovery.md)
+remain historical. Windows stays Preview; this update has no fresh native x64
+runtime qualification.
 
 ## Historical 1.3.0/build 10 candidate validation
 

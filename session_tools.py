@@ -51,6 +51,9 @@ class SessionTools:
     def control_ready(self, child, path):
         if not child.proc or child.proc.poll() is not None:
             return False
+        if os.name == 'nt':
+            proof = getattr(child, 'windows_auth_proof', None)
+            return bool(proof and proof.ready(child))
         if child.ready:
             return True  # Authentication is stable for this owned process generation.
         if not Path(path).exists():
@@ -72,12 +75,19 @@ class SessionTools:
         server = self.server(ident)
         self.check_identity_setup(server)
         if os.name == 'nt':
-            raise ValueError('Session-only transports require OpenSSH control sockets on this platform.')
-        directory = tempfile.TemporaryDirectory(prefix='hh-session-', dir='/tmp')
+            from windows_session import AuthenticationDirectory
+            directory = AuthenticationDirectory(self.data / 'runtime', 'hh-session-')
+        else:
+            directory = tempfile.TemporaryDirectory(prefix='hh-session-', dir='/tmp')
         path = Path(directory.name) / 'control'
-        args = [self.ssh_executable(), '-F', str(self.data / 'ssh_config'), '-N', '-n',
-                '-M', '-S', str(path), '-o', 'ControlPersist=no', 'pm_' + ident]
+        transport = ['-M', '-S', str(path), '-o', 'ControlPersist=no']
+        if os.name == 'nt':
+            from windows_session import WindowsAuthenticationProof
+            transport = WindowsAuthenticationProof.options()
+        args = [self.ssh_executable(), '-F', str(self.data / 'ssh_config'), '-N', '-n', *transport, 'pm_' + ident]
         child = self.make_child(args, server['name'] + ' / SSH', 'session-' + ident, ident)
+        if os.name == 'nt':
+            child.windows_auth_proof = WindowsAuthenticationProof(path)
         sessions[ident] = {'child': child, 'path': path, 'directory': directory, 'status': 'connecting'}
         child.spawn()
 
@@ -324,15 +334,25 @@ class SessionTools:
             key_type = keys[0].split()[0]
             algorithms = 'rsa-sha2-512,rsa-sha2-256' if key_type == 'ssh-rsa' else key_type
             self.check_identity_setup(original)
-            directory = tempfile.TemporaryDirectory(prefix='hh-proof-', dir='/tmp' if os.name != 'nt' else None)
+            if os.name == 'nt':
+                from windows_session import AuthenticationDirectory
+                directory = AuthenticationDirectory(self.data / 'runtime', 'hh-proof-')
+            else:
+                directory = tempfile.TemporaryDirectory(prefix='hh-proof-', dir='/tmp')
             known, control = Path(directory.name) / 'known', Path(directory.name) / 'control'
             self.write_private(known, ''.join(new_host + ' ' + key + '\n' for key in keys))
+            transport = ['-M', '-S', str(control), '-o', 'ControlPersist=no']
+            if os.name == 'nt':
+                from windows_session import WindowsAuthenticationProof
+                transport = WindowsAuthenticationProof.options()
             args = [self.ssh_executable(), '-F', str(self.data / 'ssh_config'), '-N', '-n',
-                    '-M', '-S', str(control), '-o', 'ControlPersist=no', '-o', 'ConnectTimeout=8',
+                    *transport, '-o', 'ConnectTimeout=8',
                     '-o', 'HostKeyAlgorithms=' + algorithms,
                     '-o', 'UserKnownHostsFile=' + self.ssh_config_path(known), '-o', 'HostName=' + candidate['host'],
                     '-p', str(candidate['port']), 'pm_' + ident]
             child = self.make_child(args, 'Endpoint continuity check', 'proof-' + ident, ident)
+            if os.name == 'nt':
+                child.windows_auth_proof = WindowsAuthenticationProof(control)
             proof_id = secrets.token_hex(12)
             registry[proof_id] = {'child': child, 'directory': directory, 'server_id': ident}
         try:

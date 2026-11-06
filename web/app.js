@@ -578,7 +578,7 @@ $('applyImport').addEventListener('click',async()=>{
 $('exportConfig').addEventListener('click',async()=>{
   try{
     const document=await request('/api/config/export');
-    if(window.webkit?.messageHandlers?.hopharborPanel){postNativePanelMessage({action:'exportConfiguration',document});return}
+    if(window.webkit?.messageHandlers?.hopharborPanel||window.chrome?.webview){postNativePanelMessage({action:'exportConfiguration',document});return}
     const url=URL.createObjectURL(new Blob([JSON.stringify(document,null,2)+'\n'],{type:'application/json'}));
     const link=el('a');link.href=url;link.download='HopHarbor-configuration.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(error){toast(errorMessage(error),true)}

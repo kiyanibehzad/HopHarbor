@@ -247,6 +247,8 @@ class Child:
         self.ready = False
         try:
             env = dict(self.manager.child_env)
+            if sys.platform == 'win32' and getattr(self, 'windows_auth_proof', None) is not None:
+                env.update(self.windows_auth_proof.begin(self))
             if sys.platform.startswith('linux') and self.server_id:
                 from agent_environment import child_environment
                 env = child_environment(env, self.manager.data)

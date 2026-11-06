@@ -6,28 +6,35 @@ Every platform uses one shared HopHarbor version and build.
 
 ## Download and install
 
-**HopHarbor 1.3.2 · build 12 — Windows preview** is available in the [shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2). The exact published ARM64 ZIP and Setup have native Windows 11 Pro 24H2 ARM64 VM validation; Windows 10 x64 compatibility evidence is also recorded. See [ARM64 validation](../../docs/windows-arm64-validation-1.3.2.md) and [recovery and historical timing limits](../../docs/windows-panel-recovery.md).
+**HopHarbor 1.4.2 · build 15 — Windows preview** is available in the
+[shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2).
+The exact ARM64 payload and Setup were tested on Windows 11 Pro 25H2 ARM64
+(build 26200.9711) with an ordinary user token. The x64 package is built and
+inspected, but this update has no fresh native x64 runtime qualification.
+See the [1.4.2 validation record](../../docs/windows-arm64-validation-1.4.2.md).
 
 | Computer | Installer |
 | --- | --- |
-| Intel / AMD x64 | [Download x64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-x64-setup.exe) |
-| Windows 11 ARM64 | [Download ARM64 Setup — Windows 11 ARM64 tested](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-windows-arm64-setup.exe) |
+| Intel / AMD x64 | [Download x64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe) |
+| Windows 11 ARM64 | [Download ARM64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe) |
 
-[Portable ZIPs](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.3.2) and [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.3.2/HopHarbor-1.3.2-SHA256SUMS.txt) are also available. Run Setup as your ordinary signed-in user, choose the optional sign-in/desktop shortcuts, and open **HopHarbor** from Start. The installers are unsigned. Both setup engines are x64; the ARM64 installer contains the native ARM64 app payload and targets Windows 11 ARM64.
+[Portable ZIPs](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2) and
+[Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt)
+are available in the same release. Run Setup as your ordinary signed-in user,
+choose the optional sign-in/desktop shortcuts, and open **HopHarbor** from Start.
+The installers are unsigned. Both setup engines are x64; the ARM64 installer
+contains the native ARM64 app payload and targets Windows 11 ARM64.
 
-Native Windows 11 Pro 24H2 ARM64 (build 26100.7840) checks passed for the exact
-published 1.3.2/build 12 files: 20 protocol, 10 security, 13 recovery, 12 production
-lifecycle, 19 forwarding and five actual install/uninstall checks. Desktop,
-helper/controller, Python, OpenSSH and WebView2 were ARM64. Inno Setup/uninstall
-engines and a separate synthetic SSH test server used x64 emulation. Native
-Windows 11 x64, physical sleep, real OS network/logon/RDP transitions, SSH-agent
-integration and signing/reputation remain unverified. Windows remains Preview;
-these VM results do not establish blanket Windows support.
+Windows remains Preview. Native Windows 11 x64, physical sleep, real OS
+network/logon/RDP transitions, SSH-agent integration and signing/reputation
+remain unverified. The synthetic SSH fixture server and installer/compiler
+engines use x64 emulation; the product controller, helper, desktop and system
+OpenSSH use native ARM64 binaries.
 
-The prior Windows 10 x64 grouped 2 MiB/four-second failure remains historical and
-failed; the ARM64 run passed the unchanged 20-case suite. Its additional synthetic
-transfer took about 0.47 seconds with the same four-second bound, not a real
-Internet-speed measurement. [Detailed ARM64 record](../../docs/windows-arm64-validation-1.3.2.md).
+[Historical 1.3.2 ARM64 validation](../../docs/windows-arm64-validation-1.3.2.md)
+and [Windows 10 x64 recovery evidence](../../docs/windows-panel-recovery.md)
+remain separate. The earlier Windows 10 x64 grouped 2 MiB/four-second protocol
+failure remains a failed historical result; passing ARM64 checks do not erase it.
 
 The desktop panel uses WinForms and Microsoft Edge WebView2. The independent
 background controller uses the Windows OpenSSH **Client**, embedded CPython and
@@ -58,7 +65,10 @@ preserves settings and saved credentials.
 Add a Session in the panel, then enter its password or private-key passphrase
 there. These secrets are stored in the signed-in user's Windows Credential
 Manager, separately for each Session. Key files remain in a user-selected
-location. The app does not import another computer's sessions or credentials.
+location. Configuration import can merge Sessions and forwarding entries from another
+computer. Imported entries stay disconnected; credentials, host trust and local
+identity-file paths are excluded. Preview the changes before applying them;
+Undo is available until subsequent configuration changes make it unsafe.
 SSH agent authentication uses that user's existing agent and is not enabled or
 reconfigured automatically. Firewall / SOCKS jump connections retain separate
 Session credentials.
@@ -98,7 +108,21 @@ remain opaque streams. UDP, TLS interception and bonding several SSH sessions
 into one faster TCP stream are not provided. macOS and Ubuntu retain their
 existing frontend implementation.
 
-To reproduce the published Windows 1.3.2 packages, use the `v1.3.2` source tag. Newer Mac source releases have not been validated as Windows updates.
+For 1.4.2 Windows inputs, use the supplementary
+[platform source archive](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-platforms-source.zip)
+or the frozen `platforms-source-1.4.2` branch:
+
+```sh
+git clone --branch platforms-source-1.4.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
+git -C HopHarbor rev-parse HEAD
+```
+
+Verify that HEAD equals the exact **Platform Source** commit listed in the
+[1.4.2 release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2).
+The original `v1.4.2` tag, Mac source ZIP and GitHub automatic Source code
+archives remain unchanged and do not contain these later Windows fixes.
+The frozen platform branch will not advance. Historical 1.3.2 packages retain
+their original `v1.3.2` source tag.
 
 Build each architecture using `python3 packaging/build_windows.py --arch arm64`
 (or `x64`) with explicit `--output-dir`, `--cache-dir` and `--dotnet` paths. Run

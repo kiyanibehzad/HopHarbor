@@ -21,7 +21,7 @@ internal static class Program
     private const int MaximumSecretBytes = 1022;
     private static readonly Regex Identifier = new("^[A-Za-z0-9_-]{1,64}$", RegexOptions.CultureInvariant);
     private static readonly UTF8Encoding Utf8 = new(false, true);
-    private static readonly HashSet<string> Modes = ["has", "put", "delete", "askpass", "hop", "control", "prepare", "prepare-package"];
+    private static readonly HashSet<string> Modes = ["has", "put", "delete", "askpass", "hop", "control", "prepare", "prepare-package", "session-ready"];
 
     [STAThread]
     private static int Main(string[] args)
@@ -38,6 +38,7 @@ internal static class Program
                 return 0;
             }
             if (args[0] == "hop") return Hop(args.Skip(1).ToArray());
+            if (args.Length == 1 && args[0] == "session-ready") { SessionReady(); return 0; }
             if (args[0] == "prepare-package")
             {
                 var options = Options(args.Skip(1).ToArray(), ["app-dir"]);
@@ -112,6 +113,33 @@ internal static class Program
                 Emit(new { ok = false, error = "windows_credentials_or_private_data_unavailable" });
             return 1;
         }
+    }
+
+    private static void SessionReady()
+    {
+        string data = WindowsFiles.LocalPath(Environment.GetEnvironmentVariable("PM_DATA_DIR") ?? "");
+        string marker = WindowsFiles.LocalPath(Environment.GetEnvironmentVariable("HOPHARBOR_AUTH_MARKER") ?? "");
+        string nonce = Environment.GetEnvironmentVariable("HOPHARBOR_AUTH_NONCE") ?? "";
+        string directory = Path.GetDirectoryName(marker)!;
+        string name = Path.GetFileName(directory);
+        if (!Regex.IsMatch(nonce, "\\A[a-f0-9]{64}\\z")
+            || !long.TryParse(Environment.GetEnvironmentVariable("HOPHARBOR_AUTH_GENERATION"), out long generation) || generation < 1
+            || Path.GetFileName(marker) != "control"
+            || !(name.StartsWith("hh-session-", StringComparison.Ordinal) || name.StartsWith("hh-proof-", StringComparison.Ordinal))
+            || !string.Equals(Path.GetDirectoryName(directory), Path.Combine(data, "runtime"), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException();
+        WindowsFiles.ValidateDirectory(data);
+        WindowsFiles.ValidateDirectory(Path.Combine(data, "runtime"));
+        WindowsFiles.ValidateDirectory(directory);
+        var user = WindowsIdentity.GetCurrent().User ?? throw new SecurityException();
+        var permissions = new FileSecurity();
+        permissions.SetOwner(user); permissions.SetAccessRuleProtection(true, false);
+        permissions.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow));
+        // CreateNew refuses preexisting files/links. Until the bounded write is
+        // complete no reader can observe a partially written authentication proof.
+        using var stream = new FileInfo(marker).Create(FileMode.CreateNew, FileSystemRights.Write, FileShare.None, 512, FileOptions.WriteThrough, permissions);
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new { nonce, generation });
+        stream.Write(bytes); stream.Flush(true);
     }
 
     private static Dictionary<string, string> Options(string[] args, string[] names)

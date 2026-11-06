@@ -20,9 +20,14 @@ sys.path.insert(0, str(ROOT))
 
 
 def main():
+    global ROOT
     parser = argparse.ArgumentParser()
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--app-dir', type=Path, default=ROOT,
+                        help='Test an installed payload instead of the source tree')
     args = parser.parse_args()
+    ROOT = args.app_dir.resolve()
+    sys.path.insert(0, str(ROOT))
     if sys.platform != 'linux':
         raise SystemExit('Requires a disposable Ubuntu GTK/WebKitGTK environment.')
     import gi
@@ -78,7 +83,7 @@ def main():
         if view is None or view.is_loading():
             return False
         try:
-            return evaluate(view, 'document.getElementById("serviceLabel")?.textContent') == 'Local service online'
+            return evaluate(view, 'document.getElementById("serviceLabel")?.textContent') == 'Online'
         except AssertionError:
             return False
 
@@ -126,7 +131,9 @@ def main():
         server.mutations = 0
         server.frame_requests = 0
         server.frame_payload = ""
-        server.manager = core.Manager(data, ROOT, server.server_address[1])
+        class FixtureManager(core.Manager):
+            allow_release_network = False
+        server.manager = FixtureManager(data, ROOT, server.server_address[1])
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         control_hash = hashlib.sha256((data / 'control.json').read_bytes()).hexdigest()
@@ -151,6 +158,7 @@ def main():
                 'direct': "window.webkit.messageHandlers.hopharborPanel.postMessage({action:'reauthenticate',reason:'retry'})",
                 'parent_bridge': "parent.webkit.messageHandlers.hopharborPanel.postMessage({action:'reauthenticate',reason:'retry'})",
                 'parent_helper': "parent.postNativePanelMessage({action:'reauthenticate',reason:'retry'})",
+                'parent_export': "parent.postNativePanelMessage({action:'exportConfiguration',document:{format:'HopHarbor configuration',schema_version:1,origin:'a'.repeat(32),sessions:[],forwards:[],settings:{}}})",
             }
             for vector, call in frame_calls.items():
                 payload = "parent.testFrameRuns.push(%s);%s;" % (json.dumps(vector), call)
@@ -177,6 +185,7 @@ def main():
                     spin(.25)
                     assert evaluate(old, 'window.testFrameRuns') == [], (vector, method)
                     assert server.frame_requests == before, (vector, method)
+                    assert app.file_dialog is None, (vector, method)
                     assert app.browser is old and app.recovery_source is None and len(server.sign_ins) == count
                     evaluate(old, '(window.testFrame.remove(),true)')
                 checks.append('native CSP prevents child scripts/navigation for ' + vector +
@@ -232,13 +241,30 @@ def main():
 
             server.mode = 401
             old, count = app.browser, len(server.sign_ins)
+            # Observe native dispatch rather than HTTP arrival: renderer startup
+            # and the server thread can add different delays to each request.
+            native_loads = []
+            scheduled_loads = []
+            load_panel = app.load_panel
+            def observed_load():
+                native_loads.append(time.monotonic())
+                scheduled_loads.append(app.recovery_budget.last_scheduled)
+                return load_panel()
+            app.load_panel = observed_load
             evaluate(old, '(refresh(true),true)')
             wait(lambda: len(server.sign_ins) == count + 3 and app.browser is not old,
                  'three automatic attempts')
             spin(2.5)
             assert len(server.sign_ins) == count + 3 and app.recovery_source is None
-            timings = server.sign_ins[-3:]
-            assert all(b - a >= 1.8 for a, b in zip(timings, timings[1:])), timings
+            app.load_panel = load_panel
+            assert len(native_loads) == 3, native_loads
+            assert all(b - a >= 2 for a, b in zip(scheduled_loads, scheduled_loads[1:])), scheduled_loads
+            # GLib's cached event-loop clock can differ slightly from Python's
+            # monotonic clock; permit 50 ms while checking actual dispatch too.
+            assert all(b - a >= 1.95 for a, b in zip(native_loads, native_loads[1:])), native_loads
+            print('Recovery timing: ' + json.dumps({'native_dispatch': native_loads,
+                                                   'scheduled': scheduled_loads,
+                                                   'http_arrival': server.sign_ins[-3:]}), flush=True)
             assert len(app.recovery_budget.attempts) == 3
             server.mode = None
             old = app.browser

@@ -411,7 +411,7 @@ def _protect(handle, directory=False):
             a.fail('Private ACL application', result)
 
 
-def ensure_private_directory(path):
+def ensure_private_directory(path, *, exist_ok=True):
     path = _path(path); a = _api()
     parent = ntpath.dirname(path)
     if parent == path:
@@ -421,6 +421,8 @@ def ensure_private_directory(path):
     with _parents(path):
         with _security(directory=True) as (attributes, _descriptor):
             created = a.k.CreateDirectoryW(_native_path(path), ctypes.byref(attributes))
+            if not created and ctypes.get_last_error() == ERROR_ALREADY_EXISTS and not exist_ok:
+                raise FileExistsError(path)
             if not created and ctypes.get_last_error() != ERROR_ALREADY_EXISTS:
                 a.fail('Private directory creation')
         handle = _open_handle(path, READ_CONTROL | FILE_READ_ATTRIBUTES | WRITE_DAC)

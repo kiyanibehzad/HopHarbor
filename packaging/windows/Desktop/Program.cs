@@ -291,7 +291,7 @@ internal sealed partial class PanelForm : Form
 
     private bool Allowed(Uri? uri) => uri is not null && uri.Scheme == "http" && uri.Host == "127.0.0.1" && uri.Port == activePort && string.IsNullOrEmpty(uri.UserInfo);
 
-    private static bool IsRepository(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var u) && u.Scheme == "https" && u.Host == "github.com" && u.Port == 443 && string.IsNullOrEmpty(u.UserInfo) && u.AbsolutePath.TrimEnd('/') == "/kiyanibehzad/HopHarbor" && string.IsNullOrEmpty(u.Query);
+    private static bool IsRepository(string? value) => PanelFilePolicy.OfficialLink(value);
 
     private async Task OpenPanelAsync(string? restoredAppearance = null, bool activate = true, bool startBackend = true)
     {
@@ -372,7 +372,7 @@ internal sealed partial class PanelForm : Form
                     return;
                 }
                 e.Cancel = true;
-                if (e.IsUserInitiated && IsRepository(e.Uri)) OpenRepository();
+                if (e.IsUserInitiated && IsRepository(e.Uri)) OpenRepository(e.Uri);
             };
             core.ContentLoading += (_, e) =>
             {
@@ -391,7 +391,7 @@ internal sealed partial class PanelForm : Form
             core.NewWindowRequested += (_, e) =>
             {
                 e.Handled = true;
-                if (e.IsUserInitiated && IsRepository(e.Uri)) OpenRepository();
+                if (e.IsUserInitiated && IsRepository(e.Uri)) OpenRepository(e.Uri);
             };
             core.ProcessFailed += (_, e) =>
             {
@@ -405,8 +405,8 @@ internal sealed partial class PanelForm : Form
                     ScheduleRecovery(view, generation, manual: false);
                 }
             };
-            string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.3.2";
-            string build = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(x => x.Key == "HopHarborBuild")?.Value ?? "12";
+            string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.4.2";
+            string build = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(x => x.Key == "HopHarborBuild")?.Value ?? "15";
             string metadata = JsonSerializer.Serialize(new { version, build });
             await core.AddScriptToExecuteOnDocumentCreatedAsync("window.HopHarborNativeVersion=" + metadata + ";window.HopHarborPlatform='win32';window.HopHarborSystemDark=" + (SystemDark() ? "true" : "false") + ";");
             if (restoredAppearance is "system" or "light" or "dark")
@@ -455,9 +455,10 @@ internal sealed partial class PanelForm : Form
 
     private void HidePanel() { reopenRequested = false; ReleaseView(); ShowInTaskbar = false; Hide(); }
 
-    private static void OpenRepository()
+    private static void OpenRepository(string url = Repository)
     {
-        try { Process.Start(new ProcessStartInfo(Repository) { UseShellExecute = true }); }
+        if (!PanelFilePolicy.OfficialLink(url)) return;
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch (System.ComponentModel.Win32Exception) { }
     }
 
@@ -473,7 +474,7 @@ internal sealed partial class PanelForm : Form
     {
         for (int i = 0; i < 120; i++)
         {
-            try { if ((await EvaluateAsync("document.getElementById('serviceLabel')?.textContent==='Local service online'")).GetBoolean()) return; }
+            try { if ((await EvaluateAsync("document.getElementById('serviceLabel')?.title==='Local service online'")).GetBoolean()) return; }
             catch (Exception) { }
             await Task.Delay(100);
         }
@@ -535,7 +536,7 @@ internal sealed partial class PanelForm : Form
             var overview = await EvaluateAsync("({title:document.getElementById('pageTitle').textContent,platform:window.HopHarborPlatform,version:document.getElementById('appVersion').textContent,fragment:location.hash,servers:document.getElementById('metricServers').textContent,tunnels:document.getElementById('metricTunnels').textContent})");
             Require(overview.GetProperty("servers").GetString() == "0" && overview.GetProperty("tunnels").GetString() == "0", "UI smoke test refuses a non-empty configuration.");
             Require(overview.GetProperty("title").GetString() == "Overview" && overview.GetProperty("platform").GetString() == "win32"
-                && overview.GetProperty("version").GetString()!.Contains("1.3.2") && overview.GetProperty("version").GetString()!.Contains("build 12")
+                && overview.GetProperty("version").GetString()!.Contains("1.4.2") && overview.GetProperty("version").GetString()!.Contains("build 15")
                 && overview.GetProperty("fragment").GetString() == "", "Overview, version or cleared bootstrap fragment failed.");
             checks.Add("Authenticated empty Overview, Windows platform, version and cleared bootstrap fragment");
             int idleTools = privateToolInvocations;

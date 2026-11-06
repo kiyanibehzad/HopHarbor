@@ -37,7 +37,7 @@ PYTHON_SHA256 = {
     'arm64': 'a8212664f7622ebc0cb0f9a42d7beee36cebedab97ff47c6bba668cfd85b676d',
 }
 APP_FILES = ('manager.py', 'log_policy.py', 'wake_monitor.py', 'session_tools.py', 'configuration_portability.py', 'release_check.py', 'ssh_hop.py',
-             'askpass.py', 'windows_platform.py', 'windows_proxy.py', 'install_windows.py')
+             'askpass.py', 'windows_platform.py', 'windows_proxy.py', 'windows_session.py', 'install_windows.py')
 WEB_FILES = ('web/index.html', 'web/app.js')
 VENDOR_FILES = tuple('vendor/windows/' + name for name in (
     'DOTNET-LICENSE.txt', 'DOTNET-THIRD-PARTY-NOTICES.txt',

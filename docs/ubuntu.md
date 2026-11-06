@@ -1,6 +1,6 @@
 # HopHarbor on Ubuntu 26.04 LTS
 
-The Ubuntu edition uses the same local English panel, Session definitions and forwarding engine as the macOS edition. It supports SOCKS, HTTP CONNECT, TCP forwarding, SSH Firewall chains, one to four SSH transports per forward, Session controls, keepalive, automatic recovery, System/Light/Dark appearance, and bounded same-day logs. It uses Ubuntu's OpenSSH, a per-user systemd service, Secret Service / GNOME Keyring, GTK/WebKitGTK, and the separately bundled, checksum-verified GOST dependency.
+The Ubuntu edition uses the same local English panel, Session definitions and forwarding engine as the macOS edition. Version **1.4.2, build 15** supports SOCKS, HTTP CONNECT, TCP forwarding, SSH Firewall chains, one to four SSH transports per forward, standalone SSH Sessions, endpoint verification, configuration import/export, search and filters, Session colors, keepalive, automatic recovery, System/Light/Dark appearance, and bounded same-day logs. It uses Ubuntu's OpenSSH, a per-user systemd service, Secret Service / GNOME Keyring, GTK/WebKitGTK, and the separately bundled, checksum-verified GOST dependency.
 
 The Ubuntu installer and packages do not install a macOS app, run launchctl, migrate another machine's settings, or change server authentication. No personal Sessions, credentials, keys or live screenshots are included.
 
@@ -9,7 +9,7 @@ The Ubuntu installer and packages do not install a macOS app, run launchctl, mig
 Choose **amd64** for Intel/AMD PCs, or **arm64** for an ARM Ubuntu installation:
 
 ```sh
-sudo apt install ./hopharbor_1.2.1_amd64.deb
+sudo apt install ./hopharbor_1.4.2_amd64.deb
 ```
 
 Open **HopHarbor** from Applications. The launcher starts only `local.hopharbor.manager.service` in your own user session. The empty default configuration opens no proxy ports. Add your Sessions, verify the server host keys, then create forwarding entries on unused local ports and test them before moving any client applications.
@@ -30,13 +30,15 @@ Do not mix a source/per-user installation with a `.deb` installation. A unit in 
 
 ## Install from reviewed source instead
 
-These commands use the published Ubuntu 1.3.2 source; newer Mac releases do not imply a validated Ubuntu update. Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
+Use the frozen `platforms-source-1.4.2` branch or the supplementary Ubuntu/Windows source archive attached to the [1.4.2 release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2). Verify `git rev-parse HEAD` against the exact Platform Source commit recorded on that release, or verify the archive with its accompanying checksum record. The original `v1.4.2` tag and macOS source archive predate the native Ubuntu additions; they are preserved historical artifacts. Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
 
 ```sh
 sudo apt update
 sudo apt install python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-ayatanaappindicator3-0.1 gir1.2-secret-1 gnome-keyring openssh-client curl dbus-user-session
-git clone --branch v1.3.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch platforms-source-1.4.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
+git rev-parse HEAD
+# Compare the commit with the release's Platform Source record before installing.
 python3 install_linux.py
 ```
 
@@ -69,6 +71,18 @@ Closing the window keeps the SSH service running. Use the top-panel indicator to
 Passwords and encrypted-key passphrases are stored in your login keyring through Secret Service, never in JSON configuration. Unlock your login keyring before saving credentials. Unattended SSH credential lookup fails safely while the keyring is locked; it does not fall back to plaintext files. Automatic login, a keyring password different from your login password, and launching outside the desktop session may require unlocking the keyring first. A private key file must exist on the Ubuntu machine; paths and credentials from a Mac are not copied automatically. Agent mode requires the intended key to be available to that desktop session's SSH agent.
 
 The panel follows the GTK desktop light/dark setting when **System** is selected. **Light** and **Dark** remain available as explicit choices. Sleep/resume recovery, keyring availability and indicator visibility depend on a working desktop session; test them on the target Ubuntu machine before relying on unattended forwarding.
+
+## Session tools and portable configuration
+
+A Session can connect through its configured Firewall chain without creating a proxy listener. Reconnect and Disconnect control that standalone SSH transport. The Tunnels bulk controls affect forwarding entries; the Sessions bulk controls also include standalone SSH connections. A confirmation identifies the action's scope, and filters do not silently exclude hidden active connections from a disconnect-all action. Manually stopped connections stay stopped after recovery.
+
+Endpoint verification proves the proposed endpoint with the existing SSH identity and trusted host key before a saved endpoint changes. A failed host-key or authentication check must be corrected before saving. Search and view-specific filters help locate Sessions and forwards. Session colors persist independently of active transports; changing a color does not reconnect SSH or rewrite host trust.
+
+Use **Tools → Export configuration** to select a JSON destination in the native Save dialog. The export contains portable definitions and colors, omitting passwords, passphrases, private keys, local key paths, host trust and control tokens. Review destination names and addresses before sharing an export. The file is written atomically with owner-only permissions. Export does not change your configuration.
+
+Use **Tools → Import configuration** to choose a regular JSON file of at most 256 KiB in the native Open dialog. Review the preview before applying changes. Reimporting the same document is a no-op; Undo restores the previous configuration while it remains available. Imported Sessions that need local keys or credentials remain blocked until configured on this machine. The panel does not receive the destination filesystem path from the native Save dialog.
+
+Release checks notify you about stable versions from the official repository. They do not download or install an update. The native panel opens only the official repository and stable release pages after a user gesture; other external navigation stays blocked.
 
 ## Files and diagnostics
 
@@ -118,8 +132,8 @@ See [the Ubuntu test record](ubuntu-testing.md) for the tested environment, resu
 The package builder works on macOS or Linux. It copies a fixed public allowlist and does not inspect private runtime directories. It downloads and verifies the appropriate GOST release; no installer or service is executed:
 
 ```sh
-python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.2.1_amd64.deb
-python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.2.1_arm64.deb
+python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.4.2_amd64.deb
+python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.4.2_arm64.deb
 ```
 
 Use `--gost-archive` for an offline build with the same pinned verification. A source/package build alone is not proof of a successful Ubuntu desktop test. Run the unit suite and the separate local integration tests on Ubuntu 26.04, including credential storage, two-hop forwarding, pool recovery, sleep/resume and desktop indicator behavior.
