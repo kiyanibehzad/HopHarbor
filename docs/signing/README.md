@@ -4,9 +4,9 @@ Status: **unsigned build trial authorized; SignPath not accepted or configured**
 The published Windows 1.4.2/build 15 packages remain unsigned Preview artifacts.
 No SignPath sponsorship, certificate issuance or signed release is claimed.
 The manual [experimental unsigned workflow](../../.github/workflows/windows-unsigned-candidate.yml)
-is enabled for review evidence. Its first run is tracked on the
-[Actions page](https://github.com/kiyanibehzad/HopHarbor/actions/workflows/windows-unsigned-candidate.yml);
-only a completed successful run supplies CI evidence. The signing workflow
+is enabled for review evidence. The [successful ARM64/x64 run](https://github.com/kiyanibehzad/HopHarbor/actions/runs/42362741736)
+and [downloaded artifact/source audit](unsigned-ci-validation.md) provide the
+current unsigned build evidence. Earlier failed attempts remain documented. The signing workflow
 retains its literal false guard and cannot run signing jobs.
 
 ## Proposed trust boundary
