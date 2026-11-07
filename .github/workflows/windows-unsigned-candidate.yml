@@ -64,6 +64,8 @@ jobs:
           # Force the resolver to restore host/target packs from pinned NuGet sources,
           # rather than silently taking the same-architecture host from SDK packs.
           $env:NetCoreTargetingPackRoot = Join-Path $env:BUILD_CACHE 'empty-sdk-pack-root'
+          # Keep .NET 10 pruning metadata from the verified SDK; do not suppress missing data.
+          $env:PrunePackageTargetingPackRoots = Join-Path $env:DOTNET_ROOT 'packs'
           New-Item -ItemType Directory -Path $env:NetCoreTargetingPackRoot | Out-Null
           python packaging/build_windows.py --arch $env:ARCH --dotnet $env:DOTNET_EXE --iscc $env:ISCC --output-dir $env:BUILD_OUTPUT --cache-dir $env:BUILD_CACHE
           python packaging/signpath_ci.py verify-inputs --arch $env:ARCH --cache-dir $env:BUILD_CACHE --output "$env:BUILD_OUTPUT/reviewed-inputs.json"
