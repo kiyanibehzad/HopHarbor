@@ -31,10 +31,6 @@ jobs:
     env:
       EXPECTED_COMMIT: ${{ inputs.expected_commit }}
       ARCH: ${{ matrix.arch }}
-      JOB_DIR: ${{ runner.temp }}/hopharbor-signpath-${{ matrix.arch }}
-      BUILD_CACHE: ${{ runner.temp }}/hopharbor-build-${{ matrix.arch }}
-      BUILD_OUTPUT: ${{ runner.temp }}/hopharbor-unsigned-${{ matrix.arch }}
-      TOOLS_ROOT: ${{ runner.temp }}/hopharbor-signing-tools-${{ matrix.arch }}
       CERT_SHA256: ${{ vars.SIGNPATH_CERTIFICATE_SHA256 }}
     steps:
       - name: Checkout the workflow's own reviewed commit
@@ -49,6 +45,14 @@ jobs:
           SIGNPATH_ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $env:JOB_DIR = Join-Path $env:RUNNER_TEMP "hopharbor-signpath-$env:ARCH"
+          "JOB_DIR=$env:JOB_DIR" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:BUILD_CACHE = Join-Path $env:RUNNER_TEMP "hopharbor-build-$env:ARCH"
+          "BUILD_CACHE=$env:BUILD_CACHE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:BUILD_OUTPUT = Join-Path $env:RUNNER_TEMP "hopharbor-unsigned-$env:ARCH"
+          "BUILD_OUTPUT=$env:BUILD_OUTPUT" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:TOOLS_ROOT = Join-Path $env:RUNNER_TEMP "hopharbor-signing-tools-$env:ARCH"
+          "TOOLS_ROOT=$env:TOOLS_ROOT" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           if ($env:EXPECTED_COMMIT -cnotmatch '^[0-9a-f]{40}$') { throw 'Exact commit required.' }
           if ($env:CERT_SHA256 -notmatch '^[0-9a-fA-F]{64}$') { throw 'Approved leaf certificate SHA-256 required.' }
           if ($env:SIGNPATH_ORG -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Confirmed SignPath organization required.' }

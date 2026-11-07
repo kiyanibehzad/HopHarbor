@@ -28,9 +28,6 @@ jobs:
     env:
       EXPECTED_COMMIT: ${{ inputs.expected_commit }}
       ARCH: ${{ matrix.arch }}
-      BUILD_CACHE: ${{ runner.temp }}/hopharbor-unsigned-cache-${{ matrix.arch }}
-      BUILD_OUTPUT: ${{ runner.temp }}/hopharbor-unsigned-output-${{ matrix.arch }}
-      TOOLS_ROOT: ${{ runner.temp }}/hopharbor-unsigned-tools-${{ matrix.arch }}
     steps:
       - name: Checkout this workflow's exact source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -42,6 +39,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          $env:BUILD_CACHE = Join-Path $env:RUNNER_TEMP "hopharbor-unsigned-cache-$env:ARCH"
+          "BUILD_CACHE=$env:BUILD_CACHE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:BUILD_OUTPUT = Join-Path $env:RUNNER_TEMP "hopharbor-unsigned-output-$env:ARCH"
+          "BUILD_OUTPUT=$env:BUILD_OUTPUT" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:TOOLS_ROOT = Join-Path $env:RUNNER_TEMP "hopharbor-unsigned-tools-$env:ARCH"
+          "TOOLS_ROOT=$env:TOOLS_ROOT" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           python packaging/signpath_ci.py metadata --source-commit $env:EXPECTED_COMMIT
           if (Test-Path -LiteralPath $env:BUILD_OUTPUT) { throw 'Build output must be fresh.' }
       - name: Verify and provision the official SDK archive
