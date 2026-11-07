@@ -31,6 +31,12 @@ jobs:
     steps:
       - name: Checkout this workflow's exact source
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -55,6 +61,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          # Force the resolver to restore host/target packs from pinned NuGet sources,
+          # rather than silently taking the same-architecture host from SDK packs.
+          $env:NetCoreTargetingPackRoot = Join-Path $env:BUILD_CACHE 'empty-sdk-pack-root'
+          New-Item -ItemType Directory -Path $env:NetCoreTargetingPackRoot | Out-Null
           python packaging/build_windows.py --arch $env:ARCH --dotnet $env:DOTNET_EXE --iscc $env:ISCC --output-dir $env:BUILD_OUTPUT --cache-dir $env:BUILD_CACHE
           python packaging/signpath_ci.py verify-inputs --arch $env:ARCH --cache-dir $env:BUILD_CACHE --output "$env:BUILD_OUTPUT/reviewed-inputs.json"
           Copy-Item -LiteralPath "$env:TOOLS_ROOT/sdk-verification.json" -Destination $env:BUILD_OUTPUT

@@ -42,6 +42,11 @@ def verify_inputs(root, cache, arch):
     if arch not in ('arm64', 'x64'):
         raise ValueError('Unsupported architecture.')
     cache = cache.resolve()
+    explicit_root = os.environ.get('NetCoreTargetingPackRoot')
+    if explicit_root:
+        pack_root = Path(explicit_root)
+        if pack_root.is_symlink() or not pack_root.is_dir() or any(pack_root.iterdir()):
+            raise ValueError('SDK pack lookup root must remain an empty ordinary directory.')
     document = json.loads((root / 'vendor/windows/provenance.json').read_text())
     rows = []
     for package in document['packages']:
@@ -72,7 +77,8 @@ def verify_inputs(root, cache, arch):
                 'Microsoft.Web.WebView2'}
     if len(rows) != 4 or {row['name'] for row in rows} != expected:
         raise ValueError('Incomplete or duplicate reviewed target dependency inventory.')
-    return {'architecture': arch, 'packages': rows, 'status': 'REVIEWED_NUGET_INPUTS_MATCH'}
+    return {'architecture': arch, 'packages': rows, 'status': 'REVIEWED_NUGET_INPUTS_MATCH',
+            'sdk_pack_lookup_redirected_to_empty_root': bool(explicit_root)}
 
 
 def record_build(root, output, arch, source_commit):
@@ -101,7 +107,8 @@ def record_build(root, output, arch, source_commit):
         if marker != dict(name='HopHarbor', version=product['version'], build=int(product['build']), architecture=arch):
             raise ValueError('Unsigned product marker mismatch.')
         for name in builder.APP_FILES + builder.WEB_FILES + builder.VENDOR_FILES + ('LICENSE', 'THIRD-PARTY-NOTICES.md'):
-            if files[name] != (root / name).read_bytes():
+            blob = subprocess.check_output(['git', 'show', source_commit + ':' + name], cwd=root)
+            if files[name] != (root / name).read_bytes() or files[name] != blob:
                 raise ValueError('Unsigned application/source mismatch: ' + name)
     reviewed = json.loads((output / 'reviewed-inputs.json').read_text())
     if reviewed['status'] != 'REVIEWED_NUGET_INPUTS_MATCH' or reviewed['architecture'] != arch:
@@ -128,6 +135,7 @@ def record_build(root, output, arch, source_commit):
     result = {'status': 'UNSIGNED_REVIEW_CANDIDATE', 'source_commit': source_commit, 'source_tree': tree,
               'version': product['version'], 'build': int(product['build']), 'architecture': arch,
               'artifacts': hashes, 'portable_files': len(files), 'portable_manifest_exact': True,
+              'application_git_blobs_exact': True,
               'builder_report': report,
               'reviewed_dependencies': reviewed, 'tool_verification': {'sdk': sdk, 'inno': inno},
               'signing': False, 'native_validation': False,

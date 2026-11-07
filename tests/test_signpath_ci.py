@@ -58,6 +58,14 @@ class SignPathInputChecks(unittest.TestCase):
         self.inventory()
         self.assertEqual(len(ci.verify_inputs(self.root, self.root / 'cache', 'arm64')['packages']), 4)
 
+    def test_explicit_sdk_pack_root_must_stay_empty(self):
+        self.inventory()
+        pack_root = self.root / 'empty-packs'; pack_root.mkdir()
+        with patch.dict(ci.os.environ, {'NetCoreTargetingPackRoot': str(pack_root)}):
+            self.assertTrue(ci.verify_inputs(self.root, self.root / 'cache', 'arm64')['sdk_pack_lookup_redirected_to_empty_root'])
+            (pack_root / 'unexpected').write_text('pack')
+            with self.assertRaises(ValueError): ci.verify_inputs(self.root, self.root / 'cache', 'arm64')
+
     def test_changed_missing_and_linked_archives_fail(self):
         rows = self.inventory()
         p = self.root / 'cache/tools/nuget' / rows[0]['name'].lower() / '1.0.0' / (rows[0]['name'].lower() + '.1.0.0.nupkg')
@@ -121,9 +129,14 @@ class SignPathInputChecks(unittest.TestCase):
         (out / 'inno-verification.json').write_text(json.dumps(dict(version='7.1.0', sha256='b' * 64)))
         return out
 
+    def fake_git(self, args, **kwargs):
+        if args[1] == 'show':
+            return (self.root / args[2].split(':', 1)[1]).read_bytes()
+        return 'a' * 40
+
     def test_unsigned_provenance_records_manifest_and_checksums(self):
         out = self.build_fixture()
-        with patch.object(ci.subprocess, 'check_output', return_value='a' * 40):
+        with patch.object(ci.subprocess, 'check_output', side_effect=self.fake_git):
             result = ci.record_build(self.root, out, 'arm64', 'a' * 40)
         self.assertFalse(result['signing'])
         self.assertFalse(result['native_validation'])
@@ -132,7 +145,7 @@ class SignPathInputChecks(unittest.TestCase):
 
     def test_unsigned_provenance_rejects_source_and_tool_mismatches(self):
         out = self.build_fixture()
-        with patch.object(ci.subprocess, 'check_output', return_value='a' * 40):
+        with patch.object(ci.subprocess, 'check_output', side_effect=self.fake_git):
             (self.root / 'manager.py').write_text('changed')
             with self.assertRaises(ValueError): ci.record_build(self.root, out, 'arm64', 'a' * 40)
             (self.root / 'manager.py').write_text('synthetic manager.py')
@@ -141,7 +154,7 @@ class SignPathInputChecks(unittest.TestCase):
 
     def test_unsigned_provenance_rejects_wrong_arch_and_extra_artifact(self):
         out = self.build_fixture()
-        with patch.object(ci.subprocess, 'check_output', return_value='a' * 40):
+        with patch.object(ci.subprocess, 'check_output', side_effect=self.fake_git):
             with self.assertRaises(ValueError): ci.record_build(self.root, out, 'x64', 'a' * 40)
             (out / 'HopHarbor-unreviewed.exe').write_bytes(b'unexpected')
             with self.assertRaises(ValueError): ci.record_build(self.root, out, 'arm64', 'a' * 40)
@@ -149,11 +162,20 @@ class SignPathInputChecks(unittest.TestCase):
     def test_unsigned_provenance_requires_exact_builder_report(self):
         out = self.build_fixture()
         report = out / 'HopHarbor-1.4.2-windows-arm64-build.json'
-        with patch.object(ci.subprocess, 'check_output', return_value='a' * 40):
+        with patch.object(ci.subprocess, 'check_output', side_effect=self.fake_git):
             document = json.loads(report.read_text()); document['sha256'] = '0' * 64
             report.write_text(json.dumps(document))
             with self.assertRaises(ValueError): ci.record_build(self.root, out, 'arm64', 'a' * 40)
             report.unlink()
+            with self.assertRaises(ValueError): ci.record_build(self.root, out, 'arm64', 'a' * 40)
+
+    def test_unsigned_provenance_rejects_checkout_conversion_vs_git_blob(self):
+        out = self.build_fixture()
+        def altered_git(args, **kwargs):
+            if args[1] == 'show' and args[2].endswith(':manager.py'):
+                return b'different Git blob'
+            return self.fake_git(args, **kwargs)
+        with patch.object(ci.subprocess, 'check_output', side_effect=altered_git):
             with self.assertRaises(ValueError): ci.record_build(self.root, out, 'arm64', 'a' * 40)
 
 
