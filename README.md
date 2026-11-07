@@ -72,32 +72,27 @@ The installer builds the native app and Keychain helper, installs a per-user Lau
 
 [macOS file locations and advanced installation options](#macos-installation-details) · [Create your first Session](#first-session)
 
+## Screenshots — 1.4.2 · build 15
+
+Captured on **macOS** using the shared HopHarbor panel. These are macOS captures, not native Ubuntu or Windows screenshots. All names, `demo` usernames, documentation-only addresses and connection states are **synthetic examples**, not personal settings or live server connections.
+
+### Sessions, colors and connection controls
+
+![HopHarbor 1.4.2 on macOS: Session cards, color strips and connection controls with synthetic demo data](docs/images/macos-1.4.2-sessions.png)
+
+### Firewall dependencies
+
+![HopHarbor 1.4.2 on macOS: Firewall details showing synthetic direct and transitive Session dependencies](docs/images/macos-1.4.2-firewall.png)
+
+### Tools: Import and Export
+
+![HopHarbor 1.4.2 on macOS: Tools menu with configuration Import and Export using synthetic demo data](docs/images/macos-1.4.2-tools.png)
+
 ## How it runs
 
 HopHarbor keeps SSH connections in a background service separate from its desktop panel. macOS uses its system OpenSSH client, launchd, Keychain and a native Dock/menu bar app. Ubuntu uses OpenSSH, a per-user systemd service, GNOME Keyring / Secret Service, and GTK/WebKitGTK with an application indicator. Closing either panel keeps connections running.
 
 GOST is an additional, checksum-verified dependency for local HTTP proxying and TCP connection distribution on macOS and Ubuntu. The Windows preview uses system OpenSSH, a per-user controller, Windows Credential Manager, a WebView2/tray panel and the project's own Python proxy frontend; it ships no GOST executable. Public packages and source contain no personal Sessions, credentials or keys.
-
-## Screenshots
-
-### Ubuntu 26.04 · Dark appearance
-
-![Ubuntu panel with an empty synthetic test configuration](docs/images/ubuntu-overview.png)
-
-
-These screenshots use **synthetic demo data** only. Example names, documentation-only addresses and simulated connection states do not show a personal configuration or live server connections.
-
-### Overview
-
-![HopHarbor Overview with synthetic demo data](docs/images/overview.png)
-
-### Port Forwarding by Session
-
-![HopHarbor port forwarding grouped by example Sessions](docs/images/port-forwarding.png)
-
-### Session controls and status
-
-![HopHarbor Session status and connection controls with synthetic demo data](docs/images/sessions.png)
 
 ## Sessions and Port Forwarding
 
@@ -297,11 +292,3 @@ HopHarbor's original code is MIT-licensed; see [LICENSE](LICENSE). GOST's MIT no
 The user service requests a soft open-file limit of up to 8,192, bounded by macOS and the inherited hard limit. This prevents the small default launchd limit from rejecting new proxy connections under concurrent traffic. Existing higher limits are preserved; hard limits are not lowered. Service status exposes the effective limits for diagnostics.
 
 Built by **Behzad Kiyani** with **Codex** · [GitHub](https://github.com/kiyanibehzad/HopHarbor)
-
-## macOS interface
-
-Synthetic examples of Session colors, live status icons, Firewall details and Tools; names and documentation-only addresses are illustrative. [1.4.2 installation guide](docs/macos-1.4.2.md).
-
-![Synthetic Session cards](docs/images/macos-1.4.2-sessions.png)
-
-![Tools menu with synthetic data](docs/images/macos-1.4.2-tools.png)
