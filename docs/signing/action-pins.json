@@ -1,0 +1,20 @@
+{
+  "checkout": {
+    "repository": "actions/checkout",
+    "ref": "v5.0.0",
+    "commit": "08c6903cd8c0fde910a37f88322edcfb5dd907a8",
+    "source": "https://api.github.com/repos/actions/checkout/git/ref/tags/v5.0.0"
+  },
+  "upload-artifact": {
+    "repository": "actions/upload-artifact",
+    "ref": "v4.6.2",
+    "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+    "source": "https://api.github.com/repos/actions/upload-artifact/git/ref/tags/v4.6.2"
+  },
+  "signpath": {
+    "repository": "SignPath/github-action-submit-signing-request",
+    "ref": "v3",
+    "commit": "f6d04783b4569d051e0c80105fe66e82819d0092",
+    "source": "https://api.github.com/repos/SignPath/github-action-submit-signing-request/git/ref/tags/v3"
+  }
+}

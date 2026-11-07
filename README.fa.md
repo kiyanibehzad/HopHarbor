@@ -7,6 +7,8 @@
 
 [English guide](README.md) · [دانلود و انتشارها](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
+**سیاست امضای کد:** انتشارهای ویندوز همچنان Preview و بدون امضا هستند. [سیاست امضا](docs/signing/code-signing-policy.md)، [حریم خصوصی](docs/signing/privacy-policy.md) و [ساخت آزمایشی بدون امضا](docs/signing/README.md) وضعیت آماده‌سازی را توضیح می‌دهند؛ پذیرش SignPath هنوز انجام نشده است.
+
 ## سیستم‌های پشتیبانی‌شده
 
 **HopHarbor 1.4.2 · بیلد 15** برای مک، اوبونتو و Windows Preview عرضه شده است. تگ و آرشیو اصلی مک حفظ شده‌اند؛ اصلاحات بومی اوبونتو و ویندوز در [سورس تکمیلی و گزارش اعتبارسنجی پلتفرم‌ها](docs/release-1.4.2-platforms.md) مشخص‌اند. [تغییرات مک](docs/release-1.4.2.md).

@@ -1,0 +1,76 @@
+# Human-authorized manual experimental unsigned build. No signing or release publication.
+name: Windows experimental unsigned build
+"on":
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed main commit, equal to this workflow run SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: windows-unsigned-candidate
+  cancel-in-progress: false
+jobs:
+  build:
+    if: ${{ github.repository == 'kiyanibehzad/HopHarbor' && github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha }}
+    runs-on: windows-2025
+    timeout-minutes: 45
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        arch: [arm64, x64]
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      ARCH: ${{ matrix.arch }}
+      BUILD_CACHE: ${{ runner.temp }}/hopharbor-unsigned-cache-${{ matrix.arch }}
+      BUILD_OUTPUT: ${{ runner.temp }}/hopharbor-unsigned-output-${{ matrix.arch }}
+      TOOLS_ROOT: ${{ runner.temp }}/hopharbor-unsigned-tools-${{ matrix.arch }}
+    steps:
+      - name: Checkout this workflow's exact source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Validate source and product metadata
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/signpath_ci.py metadata --source-commit $env:EXPECTED_COMMIT
+          if (Test-Path -LiteralPath $env:BUILD_OUTPUT) { throw 'Build output must be fresh.' }
+      - name: Verify and provision the official SDK archive
+        run: ./.github/scripts/windows-build-tools.ps1 -Mode Sdk -ToolsRoot $env:TOOLS_ROOT
+      - name: Verify and provision the official Inno compiler
+        run: ./.github/scripts/windows-build-tools.ps1 -Mode Inno -ToolsRoot $env:TOOLS_ROOT
+      - name: Build unsigned ZIP and Setup and verify resolved dependencies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/build_windows.py --arch $env:ARCH --dotnet $env:DOTNET_EXE --iscc $env:ISCC --output-dir $env:BUILD_OUTPUT --cache-dir $env:BUILD_CACHE
+          python packaging/signpath_ci.py verify-inputs --arch $env:ARCH --cache-dir $env:BUILD_CACHE --output "$env:BUILD_OUTPUT/reviewed-inputs.json"
+          Copy-Item -LiteralPath "$env:TOOLS_ROOT/sdk-verification.json" -Destination $env:BUILD_OUTPUT
+          Copy-Item -LiteralPath "$env:TOOLS_ROOT/inno-verification.json" -Destination $env:BUILD_OUTPUT
+          git diff --quiet HEAD --
+          python packaging/signpath_ci.py record-build --arch $env:ARCH --source-commit $env:EXPECTED_COMMIT --output-dir $env:BUILD_OUTPUT
+      - name: Retain unsigned review artifacts and provenance only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unsigned-review-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            ${{ env.BUILD_OUTPUT }}/HopHarbor-*-portable.zip
+            ${{ env.BUILD_OUTPUT }}/HopHarbor-*-setup.exe
+            ${{ env.BUILD_OUTPUT }}/HopHarbor-*-build.json
+            ${{ env.BUILD_OUTPUT }}/reviewed-inputs.json
+            ${{ env.BUILD_OUTPUT }}/sdk-verification.json
+            ${{ env.BUILD_OUTPUT }}/inno-verification.json
+            ${{ env.BUILD_OUTPUT }}/build-provenance.json
+            ${{ env.BUILD_OUTPUT }}/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      # No SignPath account/token/environment, no signing, no release publication.

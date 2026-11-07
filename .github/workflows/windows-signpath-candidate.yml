@@ -1,0 +1,215 @@
+# Signing remains disabled. Only the separate unsigned build trial is authorized.
+# The literal false is an intentional activation lock, not a missing expression.
+name: Windows SignPath candidate (DORMANT)
+"on":
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Exact reviewed main commit, equal to this workflow run SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: signpath-candidate
+  cancel-in-progress: false
+jobs:
+  build-and-sign:
+    if: ${{ false && github.repository == 'kiyanibehzad/HopHarbor' && github.ref == 'refs/heads/main' && inputs.expected_commit == github.sha }}
+    runs-on: windows-2025
+    environment: signpath-release
+    timeout-minutes: 150
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        arch: [arm64, x64]
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      ARCH: ${{ matrix.arch }}
+      JOB_DIR: ${{ runner.temp }}/hopharbor-signpath-${{ matrix.arch }}
+      BUILD_CACHE: ${{ runner.temp }}/hopharbor-build-${{ matrix.arch }}
+      BUILD_OUTPUT: ${{ runner.temp }}/hopharbor-unsigned-${{ matrix.arch }}
+      TOOLS_ROOT: ${{ runner.temp }}/hopharbor-signing-tools-${{ matrix.arch }}
+      CERT_SHA256: ${{ vars.SIGNPATH_CERTIFICATE_SHA256 }}
+    steps:
+      - name: Checkout the workflow's own reviewed commit
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Validate activation prerequisites and source identity
+        id: meta
+        env:
+          SIGNPATH_ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EXPECTED_COMMIT -cnotmatch '^[0-9a-f]{40}$') { throw 'Exact commit required.' }
+          if ($env:CERT_SHA256 -notmatch '^[0-9a-fA-F]{64}$') { throw 'Approved leaf certificate SHA-256 required.' }
+          if ($env:SIGNPATH_ORG -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Confirmed SignPath organization required.' }
+          if (Test-Path $env:JOB_DIR) { throw 'Job directory must be new.' }
+          $signTool = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe'
+          if (!(Test-Path -LiteralPath $signTool -PathType Leaf)) { throw 'Pinned Windows SDK SignTool absent.' }
+          "SIGNTOOL=$signTool" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          python packaging/signpath_ci.py metadata --source-commit $env:EXPECTED_COMMIT --github-output $env:GITHUB_OUTPUT
+          if ($LASTEXITCODE -ne 0) { throw 'Source metadata check failed.' }
+      - name: Verify and provision the official SDK archive
+        run: ./.github/scripts/windows-build-tools.ps1 -Mode Sdk -ToolsRoot $env:TOOLS_ROOT
+      - name: Fresh build, dependency archive verification and signing allowlist
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/build_windows.py --arch $env:ARCH --dotnet $env:DOTNET_EXE --output-dir $env:BUILD_OUTPUT --cache-dir $env:BUILD_CACHE
+          python packaging/signpath_ci.py verify-inputs --arch $env:ARCH --cache-dir $env:BUILD_CACHE --output "$env:BUILD_OUTPUT/reviewed-inputs.json"
+          $zip = Join-Path $env:BUILD_OUTPUT "HopHarbor-$env:APP_VERSION-windows-$env:ARCH-portable.zip"
+          python packaging/windows/signing/pipeline.py prepare --unsigned-zip $zip --arch $env:ARCH --work-dir $env:JOB_DIR --source-commit $env:EXPECTED_COMMIT
+          Copy-Item -LiteralPath "$env:BUILD_OUTPUT/reviewed-inputs.json" -Destination "$env:JOB_DIR/reviewed-inputs.json"
+          Copy-Item -LiteralPath "$env:TOOLS_ROOT/sdk-verification.json" -Destination $env:JOB_DIR
+      - name: Upload only project PE signing inputs
+        id: project_upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: project-pe-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ env.JOB_DIR }}/project-request/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Request manual signing approval for project binaries
+        id: project_sign
+        uses: SignPath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: hopharbor
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: hopharbor-project-pe-v1
+          github-artifact-id: ${{ steps.project_upload.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: ${{ env.JOB_DIR }}/project-signed
+          parameters: |
+            productVersion: ${{ toJSON(steps.meta.outputs.version) }}
+            fileVersion: ${{ toJSON(steps.meta.outputs.file_version) }}
+      - name: Verify signed project bytes and prepare Inno uninstaller handoff
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+          APP_BUILD: ${{ steps.meta.outputs.build }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/windows/signing/pipeline.py apply --work-dir $env:JOB_DIR --signed-dir "$env:JOB_DIR/project-signed" --certificate-sha256 $env:CERT_SHA256 --signtool $env:SIGNTOOL
+          & ./.github/scripts/windows-build-tools.ps1 -Mode Inno -ToolsRoot $env:TOOLS_ROOT
+          Copy-Item -LiteralPath "$env:TOOLS_ROOT/inno-verification.json" -Destination $env:JOB_DIR
+          $iscc = Join-Path $env:TOOLS_ROOT 'inno/ISCC.exe'
+          New-Item -ItemType Directory -Path "$env:JOB_DIR/uninstaller-cache" | Out-Null
+          $compilerArguments = @('--no-ide-signtools',"/DPackageRoot=$env:JOB_DIR/signed-payload", "/DOutputDir=$env:JOB_DIR/unsigned-setup", "/DSignedUninstallerCache=$env:JOB_DIR/uninstaller-cache", "/DAppVersion=$env:APP_VERSION", "/DAppBuild=$env:APP_BUILD", "/DTargetArch=$env:ARCH", 'packaging/windows/HopHarbor.iss')
+          $PSNativeCommandUseErrorActionPreference = $false
+          $ErrorActionPreference = 'Continue'
+          & $iscc @compilerArguments 2>&1 | Tee-Object -FilePath "$env:JOB_DIR/inno-first-pass.log"
+          $compilerExit = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/windows/signing/pipeline.py capture-uninstaller --work-dir $env:JOB_DIR --cache-dir "$env:JOB_DIR/uninstaller-cache" --compiler-log "$env:JOB_DIR/inno-first-pass.log" --compiler-exit-code $compilerExit
+      - name: Upload generated uninstaller only
+        id: uninstaller_upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: uninstaller-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ env.JOB_DIR }}/uninstaller-request/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Request manual signing approval for uninstaller
+        id: uninstaller_sign
+        uses: SignPath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: hopharbor
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: hopharbor-uninstaller-v1
+          github-artifact-id: ${{ steps.uninstaller_upload.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: ${{ env.JOB_DIR }}/uninstaller-signed
+          parameters: |
+            productVersion: ${{ toJSON(steps.meta.outputs.version) }}
+            fileVersion: "51.1055.0.0"
+      - name: Verify signed uninstaller, repeat exact compile and capture outer Setup
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+          APP_BUILD: ${{ steps.meta.outputs.build }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/windows/signing/pipeline.py apply-uninstaller --work-dir $env:JOB_DIR --signed-dir "$env:JOB_DIR/uninstaller-signed" --certificate-sha256 $env:CERT_SHA256 --signtool $env:SIGNTOOL
+          & $env:ISCC --no-ide-signtools "/DPackageRoot=$env:JOB_DIR/signed-payload" "/DOutputDir=$env:JOB_DIR/unsigned-setup" "/DSignedUninstallerCache=$env:JOB_DIR/uninstaller-cache" "/DAppVersion=$env:APP_VERSION" "/DAppBuild=$env:APP_BUILD" "/DTargetArch=$env:ARCH" packaging/windows/HopHarbor.iss
+          python packaging/windows/signing/pipeline.py capture-installer --work-dir $env:JOB_DIR --installer "$env:JOB_DIR/unsigned-setup/HopHarbor-$env:APP_VERSION-windows-$env:ARCH-setup.exe"
+      - name: Upload outer installer only
+        id: installer_upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installer-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ env.JOB_DIR }}/installer-request/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Request manual signing approval for outer installer
+        id: installer_sign
+        uses: SignPath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: hopharbor
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: hopharbor-installer-v1
+          github-artifact-id: ${{ steps.installer_upload.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: ${{ env.JOB_DIR }}/installer-signed
+          parameters: |
+            productVersion: ${{ toJSON(steps.meta.outputs.version) }}
+            fileVersion: ${{ toJSON(steps.meta.outputs.file_version) }}
+      - name: Verify final signed Setup and vendor preservation
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python packaging/windows/signing/pipeline.py apply-installer --work-dir $env:JOB_DIR --signed-dir "$env:JOB_DIR/installer-signed" --certificate-sha256 $env:CERT_SHA256 --signtool $env:SIGNTOOL
+      - name: Record request identifiers and final checksums
+        env:
+          PROJECT_REQUEST_ID: ${{ steps.project_sign.outputs.signing-request-id }}
+          UNINSTALLER_REQUEST_ID: ${{ steps.uninstaller_sign.outputs.signing-request-id }}
+          INSTALLER_REQUEST_ID: ${{ steps.installer_sign.outputs.signing-request-id }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($requestId in @($env:PROJECT_REQUEST_ID,$env:UNINSTALLER_REQUEST_ID,$env:INSTALLER_REQUEST_ID)) { if ([string]::IsNullOrWhiteSpace($requestId)) { throw 'Missing provider request ID.' } }
+          $requests = @{ source_commit=$env:EXPECTED_COMMIT; run_id=$env:RUN_ID; architecture=$env:ARCH; project=$env:PROJECT_REQUEST_ID; uninstaller=$env:UNINSTALLER_REQUEST_ID; installer=$env:INSTALLER_REQUEST_ID; certificate_sha256=$env:CERT_SHA256 }
+          $requests | ConvertTo-Json | Set-Content -LiteralPath "$env:JOB_DIR/signing-requests.json" -Encoding utf8
+          $files = Get-ChildItem -LiteralPath $env:JOB_DIR -File | Where-Object { $_.Name -like 'HopHarbor-*-portable.zip' -or $_.Name -like 'HopHarbor-*-setup.exe' }
+          if ($files.Count -ne 2) { throw 'Exactly one verified ZIP and Setup required.' }
+          $hashes = foreach ($file in ($files | Sort-Object Name)) { (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $file.Name }
+          $hashes | Set-Content -LiteralPath "$env:JOB_DIR/SHA256SUMS.txt" -Encoding utf8NoBOM
+      - name: Retain verified candidates and bounded provenance for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-candidate-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            ${{ env.JOB_DIR }}/HopHarbor-*-portable.zip
+            ${{ env.JOB_DIR }}/HopHarbor-*-setup.exe
+            ${{ env.JOB_DIR }}/SHA256SUMS.txt
+            ${{ env.JOB_DIR }}/signing-requests.json
+            ${{ env.JOB_DIR }}/baseline.json
+            ${{ env.JOB_DIR }}/reviewed-inputs.json
+            ${{ env.JOB_DIR }}/sdk-verification.json
+            ${{ env.JOB_DIR }}/inno-verification.json
+            ${{ env.JOB_DIR }}/signed-payload.json
+            ${{ env.JOB_DIR }}/signed-installer.json
+            ${{ env.JOB_DIR }}/signed-uninstaller.json
+          if-no-files-found: error
+          retention-days: 14
+      # No release write permission, tag mutation or publication step.

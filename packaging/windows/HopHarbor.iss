@@ -24,6 +24,15 @@ AppName=HopHarbor
 AppVersion={#AppVersion}
 AppVerName=HopHarbor {#AppVersion}
 VersionInfoVersion={#AppVersion}.{#AppBuild}
+#ifdef SignedUninstallerCache
+; Opt-in candidate only: compile once to generate the cache, sign that exact
+; project-specific image, then compile again before signing the outer Setup.
+SignedUninstaller=yes
+SignedUninstallerDir={#SignedUninstallerCache}
+VersionInfoProductName=HopHarbor
+VersionInfoProductVersion={#AppVersion}
+VersionInfoProductTextVersion={#AppVersion}
+#endif
 AppPublisher=HopHarbor
 AppPublisherURL=https://github.com/kiyanibehzad/HopHarbor
 AppSupportURL=https://github.com/kiyanibehzad/HopHarbor/issues

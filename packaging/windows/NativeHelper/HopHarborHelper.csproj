@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <AssemblyName>HopHarborHelper</AssemblyName>
+    <Product>HopHarbor</Product>
     <RootNamespace>HopHarbor.NativeHelper</RootNamespace>
     <Version>1.4.2</Version>
     <FileVersion>1.4.2.15</FileVersion>

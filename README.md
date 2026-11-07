@@ -7,6 +7,8 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Win
 
 [فارسی: راهنمای نصب و استفاده](README.fa.md) · [Downloads and releases](https://github.com/kiyanibehzad/HopHarbor/releases/latest)
 
+**Code signing policy:** Windows releases remain unsigned Preview builds. [Signing readiness](docs/signing/code-signing-policy.md), [privacy policy](docs/signing/privacy-policy.md) and [experimental unsigned CI](docs/signing/README.md) describe the current preparation; SignPath acceptance is pending.
+
 ## Supported systems
 
 **HopHarbor 1.4.2 · build 15** is available for macOS, Ubuntu and Windows Preview. The original Mac source tag/archive is retained; Ubuntu and Windows native updates use the [reviewed supplementary platform source and validation record](docs/release-1.4.2-platforms.md). [Mac changes](docs/release-1.4.2.md).
