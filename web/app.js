@@ -116,13 +116,12 @@ function sessionColor(server){
 }
 function newSessionColor(){const preferred=[SESSION_COLORS[4],SESSION_COLORS[1],SESSION_COLORS[5]];return preferred[crypto.getRandomValues(new Uint32Array(1))[0]%preferred.length]}
 function colorMarker(server,scope){
-  const color=sessionColor(server),button=el('button','session-color-marker');
+  const button=el('button','session-color-marker');
   button.type='button';button.id=`session-color-${scope}-${server.id}`;button.dataset.colorSession=String(server.id);
-  button.title=`Color for ${server.name||'Unnamed session'}`;button.setAttribute('aria-label',button.title);
+  button.setAttribute('aria-label',`Color for ${server.name||'Unnamed session'}`);
   button.setAttribute('aria-controls','sessionColorPanel');
   button.setAttribute('aria-expanded',String(activePopover?.toggleId===button.id));
-  const stripe=el('span','session-color-stripe');stripe.style.backgroundColor=color;stripe.setAttribute('aria-hidden','true');
-  button.append(stripe);return button;
+  return button;
 }
 const titles={dashboard:['Overview','A clear view of your SSH connections and forwarding.'],tunnels:['Port Forwarding','Manage local proxy ports and TCP forwarding.'],servers:['Sessions','Saved SSH connection settings and authentication.'],logs:['Logs','Connection activity and diagnostic details.']};
 const statusText={connected:'Connected',degraded:'Partially connected',starting:'Connecting',stopped:'Disconnected',error:'Connection error'};
@@ -201,7 +200,7 @@ function groupedForwarding(list){
     if(server){const add=actionButton('Add forwarding','plus','add-forwarding',server.id,'text-button');add.setAttribute('aria-label',`Add forwarding for session ${name}`);header.append(add)}
     const table=tunnelTable(forwards,false,true);
     table.querySelector('table').setAttribute('aria-label',`Port forwarding for ${name}`);
-    children(group,server?colorMarker(server,'forwards'):null,header,table);
+    children(group,header,table);
     return group;
   });
 }
@@ -238,7 +237,10 @@ function sessionStatusSymbol(server,scope){
   symbol.title=description;
   const tooltip=el('span','session-status-tooltip',description);tooltip.id=`${symbol.id}-tooltip`;tooltip.setAttribute('role','tooltip');
   symbol.setAttribute('aria-describedby',tooltip.id);
-  return children(el('div','session-status-symbol'),symbol,tooltip);
+  const wrapper=children(el('div','session-status-symbol'),symbol,tooltip);
+  wrapper.style.setProperty('--session-color',sessionColor(server));
+  const color=colorMarker(server,scope);color.setAttribute('aria-describedby',tooltip.id);wrapper.append(color);
+  return wrapper;
 }
 
 // Tools and Firewall details float outside the card/grid flow. Only one is open.
@@ -409,7 +411,7 @@ function renderServers(){
     const edit=actionButton('','edit','edit-server',s.id,'icon-button');edit.setAttribute('aria-label',`Edit session ${s.name||'Unnamed session'}`);edit.disabled=serverInUse(s.id,true)||pending;if(edit.disabled)edit.title='Disconnect dependent forwarding before editing this session.';
     const remove=actionButton('','trash','delete-server',s.id,'icon-button delete');remove.setAttribute('aria-label',`Delete session ${s.name||'Unnamed session'}`);remove.disabled=serverInUse(s.id)||state.servers.some(x=>String(x.jump_id)===String(s.id))||pending;if(remove.disabled)remove.title='This session is used by forwarding or by another session as a firewall.';
     children(tools,edit,remove);head.append(tools);
-    children(card,colorMarker(s,'sessions'),head);
+    card.append(head);
     const statusbar=el('div','session-statusbar');
     const counts=el('div','session-counts');
     counts.append(el('div','',metrics.total?`${num(metrics.active)} / ${num(metrics.total)} forward${metrics.total===1?'':'s'} active`:'No forwarding configured'));
@@ -486,7 +488,7 @@ function renderPlatform(){
   $('credentialNote').textContent=`Passwords you enter are saved securely in ${store==='Keychain'?'macOS Keychain':store}. Saved passwords are never displayed here.`;
   if($('lockedScreen').hidden)$('lockedCopy').textContent=`Open this panel from HopHarbor on ${device} to sign in securely.`;
 }
-function render(){renderPlatform();const focused=document.activeElement;const colorFocus=focused?.dataset.colorSession||focused?.dataset.statusSession?focused.id:null;const focusInfo=focused&&focused.dataset.action?{action:focused.dataset.action,id:focused.dataset.id,container:focused.closest('#dashboardTunnels,#allTunnels,#serverGrid')?.id}:null;const active=state.tunnels.filter(t=>['connected','degraded'].includes(t.status)).length;const errors=state.tunnels.filter(t=>t.status==='error').length;const starting=state.tunnels.filter(t=>t.status==='starting').length;$('metricActive').textContent=num(active);$('metricTunnels').textContent=num(state.tunnels.length);$('metricServers').textContent=num(state.servers.length);$('navTunnelCount').textContent=num(state.tunnels.length);$('metricActiveFoot').textContent=errors?`${num(errors)} forwarding configuration${errors===1?' needs':'s need'} attention`:starting?`${num(starting)} connecting`:'SSH connection status';$('metricServersFoot').textContent=state.servers.length?'Connection settings and firewalls':'Add a session to get started';$('lastUpdated').textContent=lastSuccess?`Updated at ${timeText(lastSuccess)}`:'Loading status...';const appInfo=window.HopHarborNativeVersion||state.service;$('appVersion').textContent=`v${String(appInfo.version||'1.4.2').replace(/^v/i,'').slice(0,32)} · build ${String(appInfo.build??15).slice(0,16)}`;renderUpdatesSummary();const migration=state.migration;$('migrationBanner').hidden=setupNoteDismissed||!migration.message||migration.phase==='complete';$('migrationTitle').textContent=migration.phase==='testing'?'Testing mode · ':'Migration status · ';$('migrationText').textContent=migration.message||'';renderTunnels();renderServers();renderLogs();renderRelease();if(colorFocus)$(colorFocus)?.focus({preventScroll:true});if(focusInfo&&focusInfo.container){const replacement=Array.from($(focusInfo.container).querySelectorAll('button[data-action]')).find(b=>b.dataset.action===focusInfo.action&&b.dataset.id===focusInfo.id&&!b.disabled);if(replacement)replacement.focus({preventScroll:true})}}
+function render(){renderPlatform();const focused=document.activeElement;const colorFocus=focused?.dataset.colorSession||focused?.dataset.statusSession?focused.id:null;const focusInfo=focused&&focused.dataset.action?{action:focused.dataset.action,id:focused.dataset.id,container:focused.closest('#dashboardTunnels,#allTunnels,#serverGrid')?.id}:null;const active=state.tunnels.filter(t=>['connected','degraded'].includes(t.status)).length;const errors=state.tunnels.filter(t=>t.status==='error').length;const starting=state.tunnels.filter(t=>t.status==='starting').length;$('metricActive').textContent=num(active);$('metricTunnels').textContent=num(state.tunnels.length);$('metricServers').textContent=num(state.servers.length);$('navTunnelCount').textContent=num(state.tunnels.length);$('metricActiveFoot').textContent=errors?`${num(errors)} forwarding configuration${errors===1?' needs':'s need'} attention`:starting?`${num(starting)} connecting`:'SSH connection status';$('metricServersFoot').textContent=state.servers.length?'Connection settings and firewalls':'Add a session to get started';$('lastUpdated').textContent=lastSuccess?`Updated at ${timeText(lastSuccess)}`:'Loading status...';const appInfo=window.HopHarborNativeVersion||state.service;$('appVersion').textContent=`v${String(appInfo.version||'1.4.3').replace(/^v/i,'').slice(0,32)} · build ${String(appInfo.build??16).slice(0,16)}`;renderUpdatesSummary();const migration=state.migration;$('migrationBanner').hidden=setupNoteDismissed||!migration.message||migration.phase==='complete';$('migrationTitle').textContent=migration.phase==='testing'?'Testing mode · ':'Migration status · ';$('migrationText').textContent=migration.message||'';renderTunnels();renderServers();renderLogs();renderRelease();if(colorFocus)$(colorFocus)?.focus({preventScroll:true});if(focusInfo&&focusInfo.container){const replacement=Array.from($(focusInfo.container).querySelectorAll('button[data-action]')).find(b=>b.dataset.action===focusInfo.action&&b.dataset.id===focusInfo.id&&!b.disabled);if(replacement)replacement.focus({preventScroll:true})}}
 function toast(message,error=false){const n=children(el('div',`toast${error?' error':''}`),icon(error?'warning':'check'),el('span','',String(message).slice(0,350)));$('toastRegion').append(n);setTimeout(()=>n.remove(),error?8000:4500)}
 async function confirmDelete(title,message,confirmLabel='Delete'){const d=$('confirmDialog');$('confirmTitle').textContent=title;$('confirmCopy').textContent=message;$('confirmYes').textContent=confirmLabel;d.showModal();return new Promise(resolve=>{let finished=false;const finish=value=>{if(finished)return;finished=true;d.close();$('confirmYes').onclick=null;$('confirmNo').onclick=null;$('confirmClose').onclick=null;d.oncancel=null;resolve(value)};$('confirmYes').onclick=()=>finish(true);$('confirmNo').onclick=()=>finish(false);$('confirmClose').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false)}})}
 async function tunnelAction(action,id){const t=state.tunnels.find(t=>String(t.id)===String(id));if(!t)return;if(action==='copy'){const address=`127.0.0.1:${t.local_port}`;try{await navigator.clipboard.writeText(address);toast('Local endpoint copied.')}catch{toast(address)}return}if(action==='edit'){if(isRunning(t)){toast('Disconnect this forwarding before editing.',true);return}openTunnel(t);return}if(busy.has(String(id)))return;if(action==='delete'&&!await confirmDelete('Delete forwarding',`Delete forwarding "${t.name}"? The saved session will remain available.`))return;busy.add(String(id));renderTunnels();try{const result=await request(`/api/tunnels/${encodeURIComponent(id)}${action==='delete'?'':`/${action}`}`,{method:action==='delete'?'DELETE':'POST',body:{}});if(action==='test')toast(result.message||'Traffic test finished.',!result.ok);else toast(action==='delete'?'Forwarding deleted.':action==='start'?'Connection requested.':action==='stop'?'Disconnection requested.':'Reconnection requested.');await refresh(true)}catch(err){toast(errorMessage(err),true)}finally{busy.delete(String(id));renderTunnels()}}

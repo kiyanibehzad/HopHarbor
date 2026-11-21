@@ -1,6 +1,6 @@
 # HopHarbor on Ubuntu 26.04 LTS
 
-The Ubuntu edition uses the same local English panel, Session definitions and forwarding engine as the macOS edition. Version **1.4.2, build 15** supports SOCKS, HTTP CONNECT, TCP forwarding, SSH Firewall chains, one to four SSH transports per forward, standalone SSH Sessions, endpoint verification, configuration import/export, search and filters, Session colors, keepalive, automatic recovery, System/Light/Dark appearance, and bounded same-day logs. It uses Ubuntu's OpenSSH, a per-user systemd service, Secret Service / GNOME Keyring, GTK/WebKitGTK, and the separately bundled, checksum-verified GOST dependency.
+The Ubuntu edition uses the same local English panel, Session definitions and forwarding engine as the macOS edition. Version **1.4.3, build 16** supports SOCKS, HTTP CONNECT, TCP forwarding, SSH Firewall chains, one to four SSH transports per forward, standalone SSH Sessions, endpoint verification, configuration import/export, search and filters, Session colors, keepalive, automatic recovery, System/Light/Dark appearance, and bounded same-day logs. It uses Ubuntu's OpenSSH, a per-user systemd service, Secret Service / GNOME Keyring, GTK/WebKitGTK, and the separately bundled, checksum-verified GOST dependency.
 
 The Ubuntu installer and packages do not install a macOS app, run launchctl, migrate another machine's settings, or change server authentication. No personal Sessions, credentials, keys or live screenshots are included.
 
@@ -9,7 +9,7 @@ The Ubuntu installer and packages do not install a macOS app, run launchctl, mig
 Choose **amd64** for Intel/AMD PCs, or **arm64** for an ARM Ubuntu installation:
 
 ```sh
-sudo apt install ./hopharbor_1.4.2_amd64.deb
+sudo apt install ./hopharbor_1.4.3_amd64.deb
 ```
 
 Open **HopHarbor** from Applications. The launcher starts only `local.hopharbor.manager.service` in your own user session. The empty default configuration opens no proxy ports. Add your Sessions, verify the server host keys, then create forwarding entries on unused local ports and test them before moving any client applications.
@@ -30,12 +30,12 @@ Do not mix a source/per-user installation with a `.deb` installation. A unit in 
 
 ## Install from reviewed source instead
 
-Use the frozen `platforms-source-1.4.2` branch or the supplementary Ubuntu/Windows source archive attached to the [1.4.2 release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2). Verify `git rev-parse HEAD` against the exact Platform Source commit recorded on that release, or verify the archive with its accompanying checksum record. The original `v1.4.2` tag and macOS source archive predate the native Ubuntu additions; they are preserved historical artifacts. Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
+Use the shared `v1.4.3` source tag. Verify HEAD against the commit listed in the [release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3). Run these commands inside a logged-in Ubuntu desktop session. The dependency installation uses sudo; the HopHarbor installer runs as your ordinary user:
 
 ```sh
 sudo apt update
 sudo apt install python3 python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-ayatanaappindicator3-0.1 gir1.2-secret-1 gnome-keyring openssh-client curl dbus-user-session
-git clone --branch platforms-source-1.4.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.3 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 git rev-parse HEAD
 # Compare the commit with the release's Platform Source record before installing.
@@ -132,8 +132,8 @@ See [the Ubuntu test record](ubuntu-testing.md) for the tested environment, resu
 The package builder works on macOS or Linux. It copies a fixed public allowlist and does not inspect private runtime directories. It downloads and verifies the appropriate GOST release; no installer or service is executed:
 
 ```sh
-python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.4.2_amd64.deb
-python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.4.2_arm64.deb
+python3 packaging/build_deb.py --arch amd64 --output /path/to/hopharbor_1.4.3_amd64.deb
+python3 packaging/build_deb.py --arch arm64 --output /path/to/hopharbor_1.4.3_arm64.deb
 ```
 
 Use `--gost-archive` for an offline build with the same pinned verification. A source/package build alone is not proof of a successful Ubuntu desktop test. Run the unit suite and the separate local integration tests on Ubuntu 26.04, including credential storage, two-hop forwarding, pool recovery, sleep/resume and desktop indicator behavior.

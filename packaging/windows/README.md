@@ -6,20 +6,18 @@ Every platform uses one shared HopHarbor version and build.
 
 ## Download and install
 
-**HopHarbor 1.4.2 · build 15 — Windows preview** is available in the
-[shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2).
-The exact ARM64 payload and Setup were tested on Windows 11 Pro 25H2 ARM64
-(build 26200.9711) with an ordinary user token. The x64 package is built and
-inspected, but this update has no fresh native x64 runtime qualification.
-See the [1.4.2 validation record](../../docs/windows-arm64-validation-1.4.2.md).
+**HopHarbor 1.4.3 · build 16 — Windows preview** is available in the
+[shared release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
+The release notes record the build and validation scope for these packages.
+See the [previous native ARM64 validation](../../docs/windows-arm64-validation-1.4.2.md) for version 1.4.2.
 
 | Computer | Installer |
 | --- | --- |
-| Intel / AMD x64 | [Download x64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe) |
-| Windows 11 ARM64 | [Download ARM64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe) |
+| Intel / AMD x64 | [Download x64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-x64-setup.exe) |
+| Windows 11 ARM64 | [Download ARM64 Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-arm64-setup.exe) |
 
-[Portable ZIPs](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2) and
-[Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt)
+[Portable ZIPs](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3) and
+[Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-Windows-1.4.3-SHA256SUMS.txt)
 are available in the same release. Run Setup as your ordinary signed-in user,
 choose the optional sign-in/desktop shortcuts, and open **HopHarbor** from Start.
 The installers are unsigned. Both setup engines are x64; the ARM64 installer
@@ -108,21 +106,15 @@ remain opaque streams. UDP, TLS interception and bonding several SSH sessions
 into one faster TCP stream are not provided. macOS and Ubuntu retain their
 existing frontend implementation.
 
-For 1.4.2 Windows inputs, use the supplementary
-[platform source archive](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-platforms-source.zip)
-or the frozen `platforms-source-1.4.2` branch:
+Use the shared source tag for these packages.
 
 ```sh
-git clone --branch platforms-source-1.4.2 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.3 --depth 1 https://github.com/kiyanibehzad/HopHarbor.git
 git -C HopHarbor rev-parse HEAD
 ```
 
-Verify that HEAD equals the exact **Platform Source** commit listed in the
-[1.4.2 release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.2).
-The original `v1.4.2` tag, Mac source ZIP and GitHub automatic Source code
-archives remain unchanged and do not contain these later Windows fixes.
-The frozen platform branch will not advance. Historical 1.3.2 packages retain
-their original `v1.3.2` source tag.
+Verify that HEAD equals the source commit listed in the
+[1.4.3 release](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
 
 Build each architecture using `python3 packaging/build_windows.py --arch arm64`
 (or `x64`) with explicit `--output-dir`, `--cache-dir` and `--dotnet` paths. Run

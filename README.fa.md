@@ -1,6 +1,6 @@
 # راهنمای نصب و استفادهٔ HopHarbor
 
-**HopHarbor 1.4.2، بیلد 15:** [نصب مک از سورس](docs/macos-1.4.2.md) · [بسته‌های اوبونتو](#نصب-روی-اوبونتو) · [Windows Preview](packaging/windows/README.md) · [سورس تکمیلی و اعتبارسنجی پلتفرم‌ها](docs/release-1.4.2-platforms.md).
+**HopHarbor 1.4.3، بیلد 16:** [نصب مک از سورس](docs/macos-1.4.3.md) · [بسته‌های اوبونتو](#نصب-روی-اوبونتو) · [Windows Preview](packaging/windows/README.md) · [یادداشت انتشار و اعتبارسنجی](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
 
 
 مدیریت اتصال‌های SSH و پراکسی SOCKS/HTTP روی **مک و اوبونتو** و **نسخهٔ آزمایشی ویندوز**، با پنل گرافیکی و سرویس پس‌زمینه.
@@ -11,23 +11,23 @@
 
 ## سیستم‌های پشتیبانی‌شده
 
-**HopHarbor 1.4.2 · بیلد 15** برای مک، اوبونتو و Windows Preview عرضه شده است. تگ و آرشیو اصلی مک حفظ شده‌اند؛ اصلاحات بومی اوبونتو و ویندوز در [سورس تکمیلی و گزارش اعتبارسنجی پلتفرم‌ها](docs/release-1.4.2-platforms.md) مشخص‌اند. [تغییرات مک](docs/release-1.4.2.md).
+**HopHarbor 1.4.3 · بیلد 16** برای مک، اوبونتو و Windows Preview عرضه شده است. همهٔ بسته‌ها از یک تگ سورس ساخته شده‌اند. [یادداشت انتشار و اعتبارسنجی](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
 
 | سیستم‌عامل | سخت‌افزار | آخرین نسخهٔ منتشرشده | روش نصب |
 | --- | --- | --- | --- |
-| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.4.2 · بیلد 15 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.4.2 · بیلد 15 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows Preview — آزمایشی** | **ARM64:** آزمون بومی در VM ویندوز 11 نسخهٔ 25H2؛ **x64:** بستهٔ ساخته‌شده و بررسی‌شده، بدون تأیید بومی ویندوز 11 x64 | 1.4.2 · بیلد 15 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
+| **macOS 13 یا جدیدتر** | **Apple Silicon / arm64** | 1.4.3 · بیلد 16 (سورس) | [ساخت از سورس](#نصب-روی-مک) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** یا **ARM64 / arm64** | 1.4.3 · بیلد 16 | [بستهٔ deb](#نصب-روی-اوبونتو) یا [نصب از سورس](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview — آزمایشی** | ویندوز 11 ARM64 یا ویندوز 10/11 x64 | 1.4.3 · بیلد 16 | [راهنمای نصب‌کننده و ZIP](packaging/windows/README.md) |
 
 نصب‌کنندهٔ فعلی مک از مدل‌های Intel پشتیبانی نمی‌کند. نسخهٔ اوبونتو ARM در ماشین مجازی بومی تست شده است؛ بستهٔ AMD64 ساخته و ساختارش بررسی شده و [محدودیت آزمون‌ها مشخص است](docs/ubuntu-testing.md).
 
 پنل‌های بومی پس از انقضای کوکی، ورود محلی را بدون راه‌اندازی دوبارهٔ اتصال‌های پس‌زمینه بازیابی می‌کنند. حفاظت بومی فریم، دسترسی فریم فرزند به بازیابی را محدود می‌کند. انتشارهای قبلی حفظ شده‌اند. وضعیت آزمون‌های [مک](docs/macos-panel-recovery.md)، [اوبونتو](docs/ubuntu-panel-recovery.md) و [ویندوز](docs/windows-panel-recovery.md) مشخص است.
 
-## نسخهٔ آزمایشی ویندوز — 1.4.2 · بیلد 15
+## نسخهٔ آزمایشی ویندوز — 1.4.3 · بیلد 16
 
-- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe).
-- [ZIP قابل‌حمل ARM64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-portable.zip) · [ZIP قابل‌حمل x64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-portable.zip) · [فایل SHA-256 ویندوز](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt) · [راهنمای نصب و محدودهٔ آزمون](packaging/windows/README.md).
+- **Intel / AMD x64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [دانلود نصب‌کننده](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-arm64-setup.exe).
+- [ZIP قابل‌حمل ARM64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-arm64-portable.zip) · [ZIP قابل‌حمل x64](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-x64-portable.zip) · [فایل SHA-256 ویندوز](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-Windows-1.4.3-SHA256SUMS.txt) · [راهنمای نصب و محدودهٔ آزمون](packaging/windows/README.md).
 
 نصب‌کننده را با حساب عادی خود اجرا کنید و HopHarbor را از Start باز کنید. OpenSSH Client و Microsoft Edge WebView2 Runtime باید از قبل موجود باشند. برنامه با تنظیمات خالی شروع می‌شود؛ Sessionهای خودتان را وارد کنید. بستهٔ آزمایشی امضای انتشار ندارد.
 
@@ -41,21 +41,21 @@
 
 بستهٔ مناسب سخت‌افزار اوبونتو را دانلود و دستور همان معماری را در پوشهٔ دانلود اجرا کنید:
 
-**Intel / AMD — amd64:** [دانلود hopharbor_1.4.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_amd64.deb)
+**Intel / AMD — amd64:** [دانلود hopharbor_1.4.3_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/hopharbor_1.4.3_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.4.2_amd64.deb
+sudo apt install ./hopharbor_1.4.3_amd64.deb
 ```
 
-**ARM64 — arm64:** [دانلود hopharbor_1.4.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_arm64.deb)
+**ARM64 — arm64:** [دانلود hopharbor_1.4.3_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/hopharbor_1.4.3_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.4.2_arm64.deb
+sudo apt install ./hopharbor_1.4.3_arm64.deb
 ```
 
 سپس **HopHarbor** را از فهرست برنامه‌ها باز کنید و Sessionها و پورت‌فورواردهای خودتان را بسازید. بسته شامل GOST تأییدشده است و APT کتابخانه‌های موردنیاز دسکتاپ را نصب می‌کند.
 
-[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Ubuntu-1.4.2-SHA256SUMS.txt)
+[راهنمای کامل اوبونتو، نصب از سورس و ارتقا](docs/ubuntu.md) · [فایل SHA-256](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-Ubuntu-1.4.3-SHA256SUMS.txt)
 
 ### نصب روی مک
 
@@ -64,7 +64,7 @@ sudo apt install ./hopharbor_1.4.2_arm64.deb
 پس از بررسی سورس اجرا کنید:
 
 ```sh
-git clone --branch v1.4.2 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.3 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"

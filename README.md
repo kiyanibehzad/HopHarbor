@@ -1,6 +1,6 @@
 # HopHarbor
 
-**HopHarbor 1.4.2 · build 15:** [macOS source installation](docs/macos-1.4.2.md) · [Ubuntu packages](#ubuntu-2604-lts) · [Windows Preview guide](packaging/windows/README.md) · [platform source and validation](docs/release-1.4.2-platforms.md).
+**HopHarbor 1.4.3 · build 16:** [macOS source installation](docs/macos-1.4.3.md) · [Ubuntu packages](#ubuntu-2604-lts) · [Windows Preview guide](packaging/windows/README.md) · [platform source and validation](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
 
 
 A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Windows preview**, SOCKS/HTTP forwarding, SSH jump chains and connection pools.
@@ -11,23 +11,23 @@ A desktop SSH proxy manager for **macOS** and **Ubuntu 26.04 LTS**, with a **Win
 
 ## Supported systems
 
-**HopHarbor 1.4.2 · build 15** is available for macOS, Ubuntu and Windows Preview. The original Mac source tag/archive is retained; Ubuntu and Windows native updates use the [reviewed supplementary platform source and validation record](docs/release-1.4.2-platforms.md). [Mac changes](docs/release-1.4.2.md).
+**HopHarbor 1.4.3 · build 16** is available for macOS, Ubuntu and Windows Preview. All packages use the same source tag. See the [release notes and validation](https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3).
 
 | Operating system | Supported hardware | Latest published app | Installation |
 | --- | --- | --- | --- |
-| **macOS 13 or later** | **Apple Silicon / arm64** | 1.4.2 · build 15 (source) | [Build from source](#macos) |
-| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.4.2 · build 15 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
-| **Windows Preview** | **ARM64:** Windows 11 25H2 native VM tested; **x64:** packages built/inspected, native Windows 11 x64 unverified | 1.4.2 · build 15 | [Setup and ZIP guide](packaging/windows/README.md) |
+| **macOS 13 or later** | **Apple Silicon / arm64** | 1.4.3 · build 16 (source) | [Build from source](#macos) |
+| **Ubuntu 26.04 LTS Desktop** | **Intel/AMD / amd64** or **ARM64 / arm64** | 1.4.3 · build 16 | [Download a .deb package](#ubuntu-2604-lts) or [install from source](docs/ubuntu.md#install-from-reviewed-source-instead) |
+| **Windows Preview** | Windows 11 ARM64 or Windows 10/11 x64 | 1.4.3 · build 16 | [Setup and ZIP guide](packaging/windows/README.md) |
 
 Intel Macs are not supported by the current macOS installer. Ubuntu arm64 has native VM validation; amd64 packages are built and inspected, with [test limits documented here](docs/ubuntu-testing.md).
 
 The native panels recover local sign-in after cookie expiry without restarting background connections. Native frame protections reject child-frame access to recovery. Existing releases remain available. [macOS](docs/macos-panel-recovery.md), [Ubuntu](docs/ubuntu-panel-recovery.md) and [Windows](docs/windows-panel-recovery.md) validation records describe the tested scope.
 
-## Windows preview — 1.4.2 · build 15
+## Windows preview — 1.4.3 · build 16
 
-- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-setup.exe).
-- **Windows 11 ARM64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-setup.exe).
-- [ARM64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-arm64-portable.zip) · [x64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-1.4.2-windows-x64-portable.zip) · [Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Windows-1.4.2-SHA256SUMS.txt) · [Installation and validation scope](packaging/windows/README.md).
+- **Intel / AMD x64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-x64-setup.exe).
+- **Windows 11 ARM64:** [Download Setup](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-arm64-setup.exe).
+- [ARM64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-arm64-portable.zip) · [x64 portable ZIP](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-1.4.3-windows-x64-portable.zip) · [Windows SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-Windows-1.4.3-SHA256SUMS.txt) · [Installation and validation scope](packaging/windows/README.md).
 
 Run Setup as your ordinary user, then open **HopHarbor** from Start. OpenSSH Client and Microsoft Edge WebView2 Runtime must already be available. Settings and credentials start empty; enter your own Sessions in the panel. The preview is unsigned.
 
@@ -41,21 +41,21 @@ Earlier Windows 10 x64 compatibility evidence belongs to **1.3.2**, including th
 
 Download the package for your Ubuntu computer, then run the matching command from its download folder:
 
-**Intel / AMD (amd64):** [Download hopharbor_1.4.2_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_amd64.deb)
+**Intel / AMD (amd64):** [Download hopharbor_1.4.3_amd64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/hopharbor_1.4.3_amd64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.4.2_amd64.deb
+sudo apt install ./hopharbor_1.4.3_amd64.deb
 ```
 
-**ARM64 (arm64):** [Download hopharbor_1.4.2_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/hopharbor_1.4.2_arm64.deb)
+**ARM64 (arm64):** [Download hopharbor_1.4.3_arm64.deb](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/hopharbor_1.4.3_arm64.deb)
 
 ```sh
-sudo apt install ./hopharbor_1.4.2_arm64.deb
+sudo apt install ./hopharbor_1.4.3_arm64.deb
 ```
 
 Open **HopHarbor** from Applications. Packages include the verified GOST dependency; APT installs the required desktop libraries. Add your own Sessions and port forwards in the panel.
 
-[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.2/HopHarbor-Ubuntu-1.4.2-SHA256SUMS.txt)
+[Full Ubuntu guide, source installation and upgrades](docs/ubuntu.md) · [SHA-256 checksums](https://github.com/kiyanibehzad/HopHarbor/releases/download/v1.4.3/HopHarbor-Ubuntu-1.4.3-SHA256SUMS.txt)
 
 ### macOS
 
@@ -64,7 +64,7 @@ For **macOS 13+ on Apple Silicon**. The current installation method builds the a
 Review the source, then run:
 
 ```sh
-git clone --branch v1.4.2 https://github.com/kiyanibehzad/HopHarbor.git
+git clone --branch v1.4.3 https://github.com/kiyanibehzad/HopHarbor.git
 cd HopHarbor
 python3 install.py
 open "$HOME/Applications/HopHarbor.app"

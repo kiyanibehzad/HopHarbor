@@ -35,8 +35,8 @@ from session_tools import SessionTools
 from configuration_portability import ConfigurationTools, normalize_color
 from release_check import ReleaseChecker
 
-VERSION = '1.4.2'
-BUILD = 15
+VERSION = '1.4.3'
+BUILD = 16
 MAC_VERSION = VERSION
 MAC_BUILD = BUILD
 ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')

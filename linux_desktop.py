@@ -18,8 +18,8 @@ import time
 from urllib.parse import quote, urlsplit
 
 
-VERSION = '1.4.2'
-BUILD = '15'
+VERSION = '1.4.3'
+BUILD = '16'
 REPOSITORY_URL = 'https://github.com/kiyanibehzad/HopHarbor'
 PANEL_CONTENT_POLICY = "script-src 'none'; frame-src 'none'; child-src 'none'"
 FILE_LIMIT = 262144

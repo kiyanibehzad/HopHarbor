@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Opt-in real Ubuntu142 Tools/UI checks; isolated generated loopback data only."""
+"""Opt-in real Ubuntu Tools/UI checks; isolated generated loopback data only."""
 import argparse
 import contextlib
 import copy
@@ -121,10 +121,10 @@ def main():
         worker=threading.Thread(target=server.serve_forever,daemon=True);worker.start()
         try:
             app=panel.desktop_application(data,args.app_dir);assert app.register(None);app.activate()
-            wait(online,'native1.4.2 Overview')
-            assert evaluate("document.getElementById('appVersion').textContent").startswith('v1.4.2')
+            wait(online,'native Overview')
+            assert evaluate("document.getElementById('appVersion').textContent")==f'v{core.VERSION} · build {core.BUILD}'
             assert evaluate('location.hash')==''
-            passed('Actual GTK/WebKit1.4.2/build15 bootstrap; current compact panel and cleared token fragment')
+            passed(f'Actual GTK/WebKit {core.VERSION}/build {core.BUILD} bootstrap; current compact panel and cleared token fragment')
             # Real owned session-only SSH, in addition to an active Firewall child.
             manager.session_action('studio','connect');manager.session_action('relay','connect')
             wait(lambda:all(manager.session_runtime.get(i,{}).get('child') and
@@ -236,15 +236,17 @@ def main():
             class Response(io.BytesIO):
                 def geturl(self):return API
             calls=[]
+            major,minor,patch=map(int,core.VERSION.split('.'))
+            newer=f'{major}.{minor}.{patch+1}'
             def opener(request,timeout):
                 calls.append(request.full_url)
-                return Response(json.dumps(dict(draft=False,prerelease=False,tag_name='v1.4.3',
-                    html_url='https://github.com/kiyanibehzad/HopHarbor/releases/tag/v1.4.3')).encode())
-            manager.release_checker=ReleaseChecker(data/'synthetic-release.json','1.4.2',core.atomic_json,opener=opener)
+                return Response(json.dumps(dict(draft=False,prerelease=False,tag_name=f'v{newer}',
+                    html_url=f'https://github.com/kiyanibehzad/HopHarbor/releases/tag/v{newer}')).encode())
+            manager.release_checker=ReleaseChecker(data/'synthetic-release.json',core.VERSION,core.atomic_json,opener=opener)
             action("document.getElementById('checkRelease').click()")
             wait(lambda:not manager.release_checker.running and manager.release_checker.result['status']=='available','manual release notice')
             refresh();assert len(calls)==1
-            assert manager.release_checker.snapshot()['latest_version']=='1.4.3'
+            assert manager.release_checker.snapshot()['latest_version']==newer
             assert not manager.release_checker.check(manual=True)
             assert not manager.release_checker.check()
             passed('Native manual release check shows a newer official fixture, obeys manual/daily throttles and downloads/installs no assets')

@@ -9,9 +9,9 @@
     <AssemblyName>HopHarborHelper</AssemblyName>
     <Product>HopHarbor</Product>
     <RootNamespace>HopHarbor.NativeHelper</RootNamespace>
-    <Version>1.4.2</Version>
-    <FileVersion>1.4.2.15</FileVersion>
-    <AssemblyVersion>1.4.2.15</AssemblyVersion>
+    <Version>1.4.3</Version>
+    <FileVersion>1.4.3.16</FileVersion>
+    <AssemblyVersion>1.4.3.16</AssemblyVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

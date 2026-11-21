@@ -405,8 +405,8 @@ internal sealed partial class PanelForm : Form
                     ScheduleRecovery(view, generation, manual: false);
                 }
             };
-            string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.4.2";
-            string build = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(x => x.Key == "HopHarborBuild")?.Value ?? "15";
+            string version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.4.3";
+            string build = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(x => x.Key == "HopHarborBuild")?.Value ?? "16";
             string metadata = JsonSerializer.Serialize(new { version, build });
             await core.AddScriptToExecuteOnDocumentCreatedAsync("window.HopHarborNativeVersion=" + metadata + ";window.HopHarborPlatform='win32';window.HopHarborSystemDark=" + (SystemDark() ? "true" : "false") + ";");
             if (restoredAppearance is "system" or "light" or "dark")
@@ -536,7 +536,7 @@ internal sealed partial class PanelForm : Form
             var overview = await EvaluateAsync("({title:document.getElementById('pageTitle').textContent,platform:window.HopHarborPlatform,version:document.getElementById('appVersion').textContent,fragment:location.hash,servers:document.getElementById('metricServers').textContent,tunnels:document.getElementById('metricTunnels').textContent})");
             Require(overview.GetProperty("servers").GetString() == "0" && overview.GetProperty("tunnels").GetString() == "0", "UI smoke test refuses a non-empty configuration.");
             Require(overview.GetProperty("title").GetString() == "Overview" && overview.GetProperty("platform").GetString() == "win32"
-                && overview.GetProperty("version").GetString()!.Contains("1.4.2") && overview.GetProperty("version").GetString()!.Contains("build 15")
+                && overview.GetProperty("version").GetString()!.Contains("1.4.3") && overview.GetProperty("version").GetString()!.Contains("build 16")
                 && overview.GetProperty("fragment").GetString() == "", "Overview, version or cleared bootstrap fragment failed.");
             checks.Add("Authenticated empty Overview, Windows platform, version and cleared bootstrap fragment");
             int idleTools = privateToolInvocations;

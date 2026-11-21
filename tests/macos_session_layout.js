@@ -32,7 +32,11 @@ function checkSessionLayout(longText,geometryOnly=false) {
   require(document.activeElement.id==='session-color-sessions-sample_firewall','Color Escape/focus failed');
   state.tunnels=[{id:'color-demo',server_id:'sample_firewall',kind:'socks',name:'Synthetic color forward',local_port:24001,pool_size:1,status:'stopped'}];
   renderTunnels();
-  require($('session-color-forwards-sample_firewall').querySelector('.session-color-stripe').style.backgroundColor===$('session-color-sessions-sample_firewall').querySelector('.session-color-stripe').style.backgroundColor,'Forwarding group color differs from Session');
+  for(const scope of ['forwards','sessions']){
+    const tile=$('session-color-'+scope+'-sample_firewall').closest('.session-status-symbol');
+    require(tile.style.getPropertyValue('--session-color')===initialColor,'Status tile frame differs from saved Session color');
+    require(getComputedStyle(tile.querySelector('.session-status-icon')).boxShadow!=='none','Status tile frame is missing');
+  }
   state.tunnels=savedTunnels;renderTunnels();
   }
   const before=geometry();
